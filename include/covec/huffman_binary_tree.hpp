@@ -52,14 +52,14 @@ namespace covec{
   /**
    * Create Huffman binary tree from values
    */
-  template <class V=double>
+  template <class V=double, class InputIterator>
   std::unique_ptr<const Node<V> >
-  create_Huffman_binary_tree(const std::vector<V>& values)
+  create_Huffman_binary_tree(InputIterator beg, InputIterator end)
   {
     typedef V value_type;
     typedef Node<V> node_type;
     
-    assert( !values.empty() );
+    assert( beg != end );
 
     // [Huffman Tree]
     // 1. create nodes from thetas
@@ -72,10 +72,12 @@ namespace covec{
     // 1. create nodes from thetas
     std::vector<std::unique_ptr<const node_type> > nodes;
     value_type Z = 0;
-    for(std::size_t i=0; i < values.size(); ++i){
-      assert( values[i] >= 0 );
-      nodes.push_back(std::make_unique<const node_type>(i, values[i]));
-      Z += values[i];
+    std::size_t i=0;
+    for(InputIterator itr=beg; itr!=end; ++itr){
+      value_type value = *itr;
+      nodes.push_back(std::make_unique<const node_type>(i, value));
+      Z += value;
+      ++i;
     }
     assert( Z > 0 );
 
@@ -106,6 +108,17 @@ namespace covec{
     return std::move(nodes[0]);
   } // end of create_Huffman_binary_tree
     
+  /**
+   * Create Huffman binary tree from values
+   */
+  template <class V=double>
+  std::unique_ptr<const Node<V> >
+  create_Huffman_binary_tree(const std::vector<V>& values)
+  {
+    return
+      create_Huffman_binary_tree<double, typename std::vector<V>::const_iterator>
+      (values.cbegin(), values.cend());
+  }				      
 
 } // end of covec
 

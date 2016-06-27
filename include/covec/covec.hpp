@@ -255,17 +255,3 @@ namespace covec{
 
 } // end of namespace covec
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-

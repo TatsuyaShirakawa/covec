@@ -4,6 +4,7 @@
 #include <vector>
 #include <random>
 #include <memory>
+#include <cassert>
 
 #include "covec/huffman_binary_tree.hpp"
 
@@ -16,11 +17,26 @@ namespace covec{
   private:
     typedef Node<double> node_type;
   public:
+
+    template <class InputIterator>
+    DiscreteDistribution(InputIterator beg, InputIterator end)
+      : probabilities_(), root_(nullptr)
+    {
+      this->set_probabilities(beg, end);
+      root_ = create_Huffman_binary_tree(beg, end);
+    }
+
     explicit DiscreteDistribution(const std::vector<double>& values)
-      : root_(nullptr)
-    { root_ = create_Huffman_binary_tree(values); }
+      : probabilities_(), root_(nullptr)
+    {
+      this->set_probabilities(values.begin(), values.end());
+      root_ = create_Huffman_binary_tree(values);
+    }
 
   public:
+
+    inline const std::vector<double>& probabilities() const
+    { return this->probabilities_; }
 
     template <class Generator>
     inline std::size_t operator()( Generator& g ) const
@@ -33,8 +49,30 @@ namespace covec{
       }
       return n->key();
     }
-    
+
   private:
+
+    template <class InputIterator>
+    void set_probabilities(InputIterator beg, InputIterator end)
+    {
+      probabilities_.clear();
+      double Z = 0.0;
+      for(InputIterator itr=beg; itr != end; ++itr){
+	const double value = *itr;
+	assert( value >= 0 );
+	probabilities_.push_back(value);
+	Z += value;
+      }
+      
+      assert( Z > 0 );
+      
+      for(std::size_t i=0; i<probabilities_.size(); ++i){
+	probabilities_[i] /= Z;
+      }
+    }
+
+  private:
+    std::vector<double> probabilities_;
     std::unique_ptr<const node_type> root_;
   }; // end of DiscreteDistribution
 
