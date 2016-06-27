@@ -4,11 +4,30 @@ This code implements a higher order extension of Skipgram with Negative Sampling
 
 Likewise SGNS, covec implicitly decomposes the multivariate pointwise mutual information (MPMI) matrix:
 
-![Figure 1. decomposition of MPMI-matrix](img/covec_decompose.png)
+![Figure 1. decomposition of MPMI-matrix](img/covec_decomposition.png)
 
-, where < u,v,...,w > is a higher order inner product of same dimensional vectors u, v, ..., w.
+where < u,v,...,w > is a higher order inner product of same dimensional vectors u, v, ..., w.
 
-## usage
+## build
+
+Run build.sh on the top of the repository, then covec is created in the build directory.
+
+## sample
+
+covec's input file is composed of space-separated lines as bellow:
+
+```
+the cat sat
+cat sat on
+sat on the
+...
+on the mat
+```
+
+In the above sample, each line indicates a cooccurrences of elements.
+
+
+You can see the all options by covec -h.
 
 ```bash
 usage: build/covec -i input_file [ options ]
