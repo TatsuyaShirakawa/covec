@@ -1,6 +1,6 @@
-# covec (COVECtorizer)
+# covec (covectorizer: higher order extension of sgns)
 
-This code implements a higher order extension of Skipgram with Negative Sampling (SGNS), which is based on CP-decomposition.
+This code implements a higher order extension of Skipgram with negative sampling (SGNS), which is based on CP-decomposition.
 
 Likewise SGNS, covec implicitly decomposes the multivariate pointwise mutual information (MPMI) matrix:
 
@@ -10,11 +10,12 @@ where < u,v,...,w > is a higher order inner product of same dimensional vectors 
 
 ## build
 
-Run build.sh on the top of the repository, then covec is created in the build directory.
+Run build.sh on the top of the repository, then covec will be created in the build directory.
 
 ## sample
 
-covec's input file is composed of space-separated lines as bellow:
+Each line of the covec's input file should be tab-separated and has same number of fields.
+Sampele of this is like bellow:
 
 ```
 the cat sat
@@ -24,17 +25,16 @@ sat on the
 on the mat
 ```
 
-In the above sample, each line indicates a cooccurrences of elements.
+In the above sample, each line indicates a cooccurrences of elements (eg. ("the", "cat", "sat") cooccur).
 
-
-You can see the all options by covec -h.
+You can see the all options by puttting help options "-h" to covec.
 
 ```bash
 usage: build/covec -i input_file [ options ]
 Options and arguments:
 --dim, -d DIM=128                        : the dimension of vectors
 --batch_size, -b BATCH_SIZE=32           : BATCH_SIZE: the (mini)batch size
---num_epochs, -n NUM_EPOCHS=10           : NUM_EPOCHS: the number of epochs
+--num_epochs, -n NUM_EPOCHS=1            : NUM_EPOCHS: the number of epochs
 --neg_size, -N NEGSIZE=1                 : the size of negative sampling
 --sigma, -s SIGMA=0.1                    : initialize each element of vector with Normal(0, SIGMA)
 --eta0, -e ETA0=0.005                    : initial learning rate for AdaGrad
@@ -45,4 +45,4 @@ Options and arguments:
 
 ```
 
-## 
+

@@ -132,23 +132,29 @@ namespace covec{
     vs_.clear();
     sqgs_.clear();
 
+    std::size_t order = probs_.size();
+    vs_.resize(order);
+    sqgs_.resize(order);
+
     std::normal_distribution<double> normal(0.0, sigma);
-    for(const auto& prob : probs_){
+    for(std::size_t i=0; i<order; ++i){
+      const auto& prob = probs_[i];
       num_entries_.push_back(prob->probabilities().size());
 
-      std::vector<std::vector<double> > vs, gs;
-	
-      for(std::size_t i=0; i<prob->probabilities().size(); ++i){
-	std::vector<double> v;
-	for(std::size_t j=0; j<this->dim_; ++j){
-	  v.push_back(normal(rd));
+      std::size_t num_entries = prob->probabilities().size();
+      std::vector<std::vector<double> > vs(num_entries),
+	sqgs(num_entries, std::vector<double>(this->dim_, 0.0));
+      
+      for(std::size_t j=0; j < num_entries; ++j){
+	std::vector<double> v(this->dim_);
+	for(std::size_t k=0; k<this->dim_; ++k){
+	  v[k] = normal(rd);
 	}
-	vs.push_back(v);
-	gs.push_back(std::vector<double>(this->dim_, 0.0));
+	vs[j] = v;
       }
 
-      vs_.push_back(vs);
-      sqgs_.push_back(gs);
+      vs_[i] = vs;
+      sqgs_[i] = sqgs;
     }
   }
 
@@ -160,14 +166,19 @@ namespace covec{
     // accumulate gradients from positive samples
     std::size_t pos_size = 0;
     for(InputIterator itr = beg; itr != end; ++itr){
+
+      ++pos_size;
+      
       assert(itr->size() == this->order());
       const auto& sample(*itr);
-
+      assert( sample.size() == this->order() );
+      
       // compute Hadamard product, inner_product, sigmoid of inner_product
       std::vector<double> Hadamard_product(this->dimension(), 1.0);
-      for(std::size_t i=0; i<sample.size(); ++i){
+      for(std::size_t i=0; i<this->order(); ++i){
 	const auto j = sample[i];
 	const auto& v = this->vs_[i][j];
+	assert( v.size() == this->dimension() );
 	for(std::size_t k = 0; k < this->dimension(); ++k){
 	  Hadamard_product[k] *= v[k];
 	}
@@ -176,13 +187,16 @@ namespace covec{
       double sigmoid = 1.0 / ( 1 + std::exp(-inner_product) );
 
       // compute gradients
-      for(std::size_t i=0; i<sample.size(); ++i){
+      for(std::size_t i=0; i<this->order(); ++i){
 	const auto& j = sample[i];
 	const auto& v = this->vs_[i][j];
-	if(grads[i].find(j) == grads[i].end()){
-	  grads[i].insert(std::make_pair(j, std::vector<double>(this->dimension(), 0.0)));
+	auto itr = grads[i].find(j);
+	if(itr == grads[i].end()){
+	  auto ret = grads[i].insert(std::make_pair(j, std::vector<double>(this->dimension(), 0.0)));
+	  itr = ret.first;
 	}
-	std::vector<double>& g = grads[i][j];
+	//	std::vector<double>& g = grads[i][j];
+	std::vector<double>& g = itr->second;
 	for(std::size_t k=0; k < this->dimension(); ++k){
 	  if( Hadamard_product[k] == 0 ){ continue; }
 	  g[k] += (1-sigmoid) * Hadamard_product[k] / v[k];
@@ -202,10 +216,11 @@ namespace covec{
 	const auto& prob(*this->probs_[i]);
 	sample[i] = prob(rd);
       }
-
+      assert( sample.size() == this->order() );
+      
       // compute Hadamard product, inner_product, sigmoid of inner_product
       std::vector<double> Hadamard_product(this->dimension(), 1.0);
-      for(std::size_t i=0; i<sample.size(); ++i){
+      for(std::size_t i=0; i<this->order(); ++i){
 	const auto j = sample[i];
 	const auto& v = this->vs_[i][j];
 	for(std::size_t k = 0; k < this->dimension(); ++k){
@@ -216,13 +231,15 @@ namespace covec{
       double sigmoid = 1.0 / ( 1 + std::exp(-inner_product) );
 
       // compute gradients
-      for(std::size_t i=0; i<sample.size(); ++i){
+      for(std::size_t i=0; i<this->order(); ++i){
 	const auto& j = sample[i];
 	const auto& v = this->vs_[i][j];
-	if(grads[i].find(j) == grads[i].end()){
-	  grads[i].insert(std::make_pair(j, std::vector<double>(this->dimension(), 0.0)));
+	auto itr = grads[i].find(j);
+	if(itr == grads[i].end()){
+	  auto ret = grads[i].insert(std::make_pair(j, std::vector<double>(this->dimension(), 0.0)));
+	  itr = ret.first;
 	}
-	std::vector<double>& g = grads[i][j];
+	std::vector<double>& g = itr->second;
 	for(std::size_t k=0; k < this->dimension(); ++k){
 	  if( Hadamard_product[k] == 0 ){ continue; }
 	  g[k] -= sigmoid * Hadamard_product[k] / v[k];
@@ -234,15 +251,18 @@ namespace covec{
 
     // update
     for(std::size_t i=0; i<this->order(); ++i){
-
+      auto& sqgs_i = this->sqgs_[i];
+      auto& vs_i = this->vs_[i];      
       // update sqgs, vs
       for(const auto& elem : grads[i]){
 	const auto j = elem.first;
 	const auto& g = elem.second;
+	auto& sqgs_ij = sqgs_i[j];
+	auto& vs_ij = vs_i[j];
 	for(std::size_t k=0; k<this->dimension(); ++k){
 	  if(g[k] != 0){
-	    this->sqgs_[i][j][k] += g[k] * g[k];
-	    this->vs_[i][j][k] += this->eta0_ * g[k] / std::sqrt(this->sqgs_[i][j][k]);
+	    sqgs_ij[k] += g[k] * g[k];
+	    vs_ij[k] += this->eta0_ * g[k] / std::sqrt(sqgs_ij[k]);
 	  }
 	}
       }

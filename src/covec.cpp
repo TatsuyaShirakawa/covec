@@ -2,9 +2,12 @@
 #include <fstream>
 #include <sstream>
 #include <iostream>
+#include <algorithm>
 #include <memory>
 #include <random>
+#include <iomanip>
 #include <unordered_map>
+#include <chrono>
 
 #include "covec/covec.hpp"
 
@@ -65,8 +68,7 @@ namespace{
   bool load(std::vector<CodeBook>& codebooks,
 	    std::vector<std::vector<std::size_t> >& data,
 	    const std::string& input_file,
-	    const char sep='\n',
-	    const std::size_t order=2)
+	    const std::size_t order)
   {
     codebooks.clear();
     codebooks.resize(2);
@@ -78,7 +80,7 @@ namespace{
     }
 
     std::string line;
-    while(std::getline(fin, line, sep)){
+    while(std::getline(fin, line)){
       std::stringstream sin;
       sin << line;
       std::vector<std::size_t> instance(order);
@@ -97,9 +99,9 @@ namespace{
   struct Config
   {
     Config()
-      : order(2), dim(128), batch_size(32), num_epochs(10)
+      : order(2), dim(128), batch_size(32), num_epochs(1)
       , neg_size(1), sigma(1.0e-1), eta0(5e-3)
-      , input_file(), output_prefix("covec"), sep(' ')
+      , input_file(), output_prefix("covec"), sep('\t')
     {}
 
     std::size_t order;
@@ -123,13 +125,13 @@ namespace{
       + "Options and arguments:\n"
       "--dim, -d DIM=128                        : the dimension of vectors\n"
       "--batch_size, -b BATCH_SIZE=32           : BATCH_SIZE: the (mini)batch size\n"
-      "--num_epochs, -n NUM_EPOCHS=10           : NUM_EPOCHS: the number of epochs\n"
+      "--num_epochs, -n NUM_EPOCHS=1            : NUM_EPOCHS: the number of epochs\n"
       "--neg_size, -N NEGSIZE=1                 : the size of negative sampling\n"
       "--sigma, -s SIGMA=0.1                    : initialize each element of vector with Normal(0, SIGMA)\n"
       "--eta0, -e ETA0=0.005                    : initial learning rate for AdaGrad\n"
       "--input_file, -i INPUT_FILE              : input file. supposed that each line is separated by SEP\n"
       "--output_prefix, -o OUTPUT_PREFIX=\"covec\": output file prefix\n"
-      "--sep, -s SEP=' '                        : separator of each line in INPUT_FILE\n"
+      "--sep, -s SEP='\t'                       : separator of each line in INPUT_FILE\n"
       "--help, -h                               : show this help message\n"
       ;
       
@@ -145,11 +147,11 @@ namespace{
       }else if( match(argv[i], "--num_epochs", "-n") ){
 	int x = std::stoi(argv[++i]);
 	REQUIRED_POSITIVE(x, "num_epochs");
-	result.batch_size = static_cast<std::size_t>(x);
+	result.num_epochs = static_cast<std::size_t>(x);
       }else if( match(argv[i], "--neg_size", "-N") ){
 	int x = std::stoi(argv[++i]);
 	REQUIRED_POSITIVE(x, "neg_size");
-	result.batch_size = static_cast<std::size_t>(x);
+	result.neg_size = static_cast<std::size_t>(x);
       }else if( match(argv[i], "--sigma", "-s") ){
 	double x = std::stod(argv[++i]);
 	REQUIRED_POSITIVE(x, "sigma");
@@ -198,9 +200,9 @@ namespace{
     }
     std::size_t result=1;
     std::size_t pos=0;
-    std::string s;
-    while( (pos = s.find(sep, pos)) != std::string::npos ){
+    while( (pos = line.find(sep, pos)) != std::string::npos ){
       ++result;
+      ++pos;
     }
     return result;
   }
@@ -261,52 +263,69 @@ int main(int narg, const char** argv)
   const char sep = config.sep;
   const std::size_t order = detect_order(input_file, sep);
 
-  std::cout << "dim          : " << dim << std::endl;
-  std::cout << "batch_size   : " << batch_size << std::endl;
-  std::cout << "num_epochs   : " << num_epochs << std::endl;
-  std::cout << "neg_size     : " << neg_size << std::endl;
-  std::cout << "sigma        : " << sigma << std::endl;
-  std::cout << "eta0         : " << eta0 << std::endl;
-  std::cout << "input_file   : " << input_file << std::endl;
-  std::cout << "output_codebook_file: " << output_prefix + ".<#>.codebook.tsv" << std::endl;
-  std::cout << "output_vector_file  : " << output_prefix + ".<#>.vector.tsv" << std::endl;  
-  std::cout << "sep          : " << sep << std::endl;
-  std::cout << "order        : " << order << std::endl;
+  std::cout << "config:" << std::endl;
+  std::cout << "  " << "dim          : " << dim << std::endl;
+  std::cout << "  " <<  "batch_size   : " << batch_size << std::endl;
+  std::cout << "  " <<  "num_epochs   : " << num_epochs << std::endl;
+  std::cout << "  " <<  "neg_size     : " << neg_size << std::endl;
+  std::cout << "  " <<  "sigma        : " << sigma << std::endl;
+  std::cout << "  " <<  "eta0         : " << eta0 << std::endl;
+  std::cout << "  " <<  "input_file   : " << input_file << std::endl;
+  std::cout << "  " <<  "output_codebook_file: " << output_prefix + ".<#>.codebook.tsv" << std::endl;
+  std::cout << "  " <<  "output_vector_file  : " << output_prefix + ".<#>.vector.tsv" << std::endl;  
+  std::cout << "  " <<  "sep          : " << "\"" << sep << "\"" << std::endl;
+  std::cout << "  " <<  "order        : " << order << std::endl;
   
   std::vector<CodeBook> codebooks;
   std::vector<std::vector<std::size_t> > data;
   std::random_device rd;
-  load(codebooks, data, input_file);
+  std::cout << "loading " << input_file << "..." << std::endl;;
+  load(codebooks, data, input_file, order);
 
+  std::cout << "data size: " << data.size() << std::endl;  
+  std::cout << "codebook sizes:" << std::endl;
+  for(std::size_t i=0; i<order; ++i){
+    std::cout << "  " << i << ": " << codebooks[i].size() << std::endl;
+  }
+
+  std::cout << "creating distributions..." << std::endl;
   std::vector<std::shared_ptr<DiscreteDistribution> > probs;
   for(std::size_t i=0; i < codebooks.size(); ++i){
     probs.push_back( std::make_shared<DiscreteDistribution>
 		     (codebooks[i].counts().begin(), codebooks[i].counts().end())
 		     );
   }
+  std::cout << "creating covec..." << std::endl;
   Covec cv(probs, rd, dim, sigma, neg_size, eta0);
 
+  std::size_t count = 0, cum_count = 0, every_count = 10000;
+  auto tick = std::chrono::system_clock::now();
   for(std::size_t epoch=0; epoch<num_epochs; ++epoch){
+    std::random_shuffle(data.begin(), data.end());
     for(std::size_t m=0; m < data.size(); m += batch_size){
+      
+      if(count >= every_count){ // reporting
+	auto tack = std::chrono::system_clock::now();
+	auto millisec = std::chrono::duration_cast<std::chrono::milliseconds>(tack - tick).count();
+	double percent = (cum_count * 100.0) / (data.size() * num_epochs);
+	std::size_t words_per_sec = (1000*count) / millisec;
+	std::cout << "\r"
+		  << "epoch " << std::right << std::setw(3) << epoch+1 << "/" << num_epochs
+		  << "  " << std::left << std::setw(5) << std::fixed << std::setprecision(2) << percent << " %"
+		  << "  " << std::left << std::setw(6) << words_per_sec << " words/sec."
+		  << std::flush;
+
+	count = 0;
+	tick = std::chrono::system_clock::now();
+      }
+      
       const std::size_t M = std::min(m + batch_size, data.size());
       cv.update_batch(data.begin() + m, data.begin() + M, rd);
+      count += M-m;
+      cum_count += M-m;
     }
   }
-
-
-  for(std::size_t i=0; i<cv.order(); ++i){
-    std::cout << "order " << i << std::endl;
-    const auto& vi = cv.vectors()[i];
-    for(std::size_t j=0; j<vi.size(); ++j){
-      std::cout << "\t" << codebooks[i].decode(j) << " :";
-      const auto& vij = vi[j];
-      for(std::size_t k=0; k<vij.size(); ++k){
-	std::cout << " " << vij[k];
-      }
-      std::cout << std::endl;
-    }
-  }
-  
+  std::cout << "saving..." << std::endl;
   save(output_prefix, cv, codebooks);
   
   return 0;
