@@ -16,9 +16,10 @@ namespace covec{
   struct Covec
   {
   public:
-    
+
+    template <class RandomGenerator>
     Covec(const std::vector<std::vector<std::size_t> >& each_counts,
-	  std::random_device& rd,
+	  RandomGenerator& gen,
 	  const std::size_t dim=128,
 	  const double sigma=1.0e-1,	  
 	  const std::size_t neg_size=1,
@@ -33,12 +34,12 @@ namespace covec{
 	probs.push_back(prob);
       }
 
-      this->initialize(probs, rd, dim, sigma, neg_size, eta0);
+      this->initialize(probs, gen, dim, sigma, neg_size, eta0);
     }
 
-    template <class InputIterator>
+    template <class InputIterator, class RandomGenerator>
     Covec(const std::vector<std::pair<InputIterator, InputIterator> >& begs_and_ends,
-	  std::random_device& rd,	  
+	  RandomGenerator& gen,	  
 	  const std::size_t dim=128,
 	  const double sigma=1.0e-1,	  
 	  const std::size_t neg_size=1,
@@ -54,11 +55,12 @@ namespace covec{
 	probs.push_back(prob);
       }
 
-      this->initialize(probs, rd, dim, sigma, neg_size, eta0);
+      this->initialize(probs, gen, dim, sigma, neg_size, eta0);
     }
 
+    template <class RandomGenerator>
     Covec(const std::vector<std::shared_ptr<DiscreteDistribution> >& probs,
-	  std::random_device& rd,	  
+	  RandomGenerator& gen,	  
 	  const std::size_t dim=128,
 	  const double sigma=1.0e-1,	  
 	  const std::size_t neg_size=1,
@@ -66,12 +68,12 @@ namespace covec{
 	  )
       : num_entries_(), dim_(), neg_size_(), eta0_()
       , vs_(), sqgs_()
-    { this->initialize(probs, rd, dim, sigma, neg_size, eta0); }
+    { this->initialize(probs, gen, dim, sigma, neg_size, eta0); }
     
   public:
 
-    template <class InputIterator>
-    void update_batch(InputIterator beg, InputIterator end, std::random_device& rd);
+    template <class InputIterator, class RandomGenerator>
+    void update_batch(InputIterator beg, InputIterator end, RandomGenerator& gen);
 
   public:
 
@@ -95,8 +97,9 @@ namespace covec{
 
   private:
 
+    template <class RandomGenerator>
     void initialize(const std::vector<std::shared_ptr<DiscreteDistribution> >& probs,
-		    std::random_device& rd,		    
+		    RandomGenerator& gen,
 		    const std::size_t dim=128,
 		    const double sigma=1.0e-1,
 		    const std::size_t neg_size=1,
@@ -115,8 +118,9 @@ namespace covec{
 
   // -------------------------------------------------------------------------------
 
+  template <class RandomGenerator>
   void Covec::initialize(const std::vector<std::shared_ptr<DiscreteDistribution> >& probs,
-			 std::random_device& rd,		    
+			 RandomGenerator& gen,
 			 const std::size_t dim,
 			 const double sigma,
 			 const std::size_t neg_size,
@@ -148,7 +152,7 @@ namespace covec{
       for(std::size_t j=0; j < num_entries; ++j){
 	std::vector<double> v(this->dim_);
 	for(std::size_t k=0; k<this->dim_; ++k){
-	  v[k] = normal(rd);
+	  v[k] = normal(gen);
 	}
 	vs[j] = v;
       }
@@ -158,8 +162,8 @@ namespace covec{
     }
   }
 
-  template <class InputIterator>
-  void Covec::update_batch(InputIterator beg, InputIterator end, std::random_device& rd)
+  template <class InputIterator, class RandomGenerator>
+  void Covec::update_batch(InputIterator beg, InputIterator end, RandomGenerator& gen)
   {
     std::vector<std::unordered_map<std::size_t, std::vector<double> > > grads(this->order());
 
@@ -214,7 +218,7 @@ namespace covec{
       std::vector<std::size_t> sample(this->order());
       for(std::size_t i=0; i<this->order(); ++i){
 	const auto& prob(*this->probs_[i]);
-	sample[i] = prob(rd);
+	sample[i] = prob(gen);
       }
       assert( sample.size() == this->order() );
       

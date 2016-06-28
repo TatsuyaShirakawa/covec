@@ -78,7 +78,3 @@ namespace covec{
 
 
 } // end of covec
-
-
-
-  

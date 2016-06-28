@@ -284,7 +284,7 @@ int main(int narg, const char** argv)
   
   std::vector<CodeBook> codebooks;
   std::vector<std::vector<std::size_t> > data;
-  std::random_device rd;
+  std::mt19937 gen(0);
   std::cout << "loading " << input_file << "..." << std::endl;;
   load(codebooks, data, input_file, order);
 
@@ -302,11 +302,12 @@ int main(int narg, const char** argv)
 		     );
   }
   std::cout << "creating covec..." << std::endl;
-  Covec cv(probs, rd, dim, sigma, neg_size, eta0);
+  Covec cv(probs, gen, dim, sigma, neg_size, eta0);
 
   std::size_t count = 0, cum_count = 0, every_count = 10000;
   auto tick = std::chrono::system_clock::now();
   for(std::size_t epoch=0; epoch<num_epochs; ++epoch){
+    std::srand(gen());
     std::random_shuffle(data.begin(), data.end());
     for(std::size_t m=0; m < data.size(); m += batch_size){
       
@@ -324,9 +325,9 @@ int main(int narg, const char** argv)
 	count = 0;
 	tick = std::chrono::system_clock::now();
       }
-      
+      std::cout << std::endl;
       const std::size_t M = std::min(m + batch_size, data.size());
-      cv.update_batch(data.begin() + m, data.begin() + M, rd);
+      cv.update_batch(data.begin() + m, data.begin() + M, gen);
       count += M-m;
       cum_count += M-m;
     }
