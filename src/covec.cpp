@@ -101,7 +101,7 @@ namespace{
     Config()
       : order(2), dim(128), batch_size(32), num_epochs(1)
       , neg_size(1), sigma(1.0e-1), eta0(5e-3)
-      , input_file(), output_prefix("covec"), sep('\t')
+      , input_file(), output_prefix("result"), sep('\t')
     {}
 
     std::size_t order;
@@ -130,7 +130,7 @@ namespace{
       "--sigma, -s SIGMA=0.1                    : initialize each element of vector with Normal(0, SIGMA)\n"
       "--eta0, -e ETA0=0.005                    : initial learning rate for AdaGrad\n"
       "--input_file, -i INPUT_FILE              : input file. supposed that each line is separated by SEP\n"
-      "--output_prefix, -o OUTPUT_PREFIX=\"covec\": output file prefix\n"
+      "--output_prefix, -o OUTPUT_PREFIX=\"vec\": output file prefix\n"
       "--sep, -s SEP='\t'                       : separator of each line in INPUT_FILE\n"
       "--help, -h                               : show this help message\n"
       ;
@@ -216,24 +216,24 @@ namespace{
 
   void save(const std::string& output_prefix, const Covec& cv, const std::vector<CodeBook>& codebooks)
   {
-    // codebooks
-    for(std::size_t i=0; i<cv.order(); ++i){
-      const std::string output_file = output_prefix + "." + std::to_string(i) + ".codebook.tsv";
-      std::ofstream fout(output_file);
-      if(!fout || !fout.good()){
-	std::cerr << "cannot open output_codebook_file: " << output_file << std::endl;
-	exit(1);
-      }
+    // // codebooks
+    // for(std::size_t i=0; i<cv.order(); ++i){
+    //   const std::string output_file = output_prefix + "." + std::to_string(i) + ".codebook.tsv";
+    //   std::ofstream fout(output_file);
+    //   if(!fout || !fout.good()){
+    // 	std::cerr << "cannot open output_codebook_file: " << output_file << std::endl;
+    // 	exit(1);
+    //   }
       
-      for(std::size_t j=0; j<codebooks[i].size(); ++j){
-	fout << j << "\t" << codebooks[i].decode(j) << "\n";
-      }
-    }
+    //   for(std::size_t j=0; j<codebooks[i].size(); ++j){
+    // 	fout << j << "\t" << codebooks[i].decode(j) << "\n";
+    //   }
+    // }
 
     // vectors
     const auto& vs = cv.vectors();
     for(std::size_t i=0; i<cv.order(); ++i){
-      const std::string output_file = output_prefix + "." + std::to_string(i) + ".vector.tsv";
+      const std::string output_file = output_prefix + "." + std::to_string(i) + ".tsv";
       std::ofstream fout(output_file);
       if(!fout || !fout.good()){
 	std::cerr << "cannot open output_vector_file: " << output_file << std::endl;
@@ -241,7 +241,7 @@ namespace{
       }
       
       for(std::size_t j=0; j<vs[i].size(); ++j){
-	fout << j;
+	fout << codebooks[i].decode(j);
 	for(std::size_t k=0; k<cv.dimension(); ++k){
 	  fout << "\t" << vs[i][j][k];
 	}
@@ -265,7 +265,7 @@ int main(int narg, const char** argv)
   const double sigma = config.sigma;
   const double eta0 = config.eta0;
   const std::string input_file = config.input_file;
-  const std::string output_prefix = "./result";
+  const std::string output_prefix = config.output_prefix;
   const char sep = config.sep;
   const std::size_t order = detect_order(input_file, sep);
 
@@ -277,8 +277,7 @@ int main(int narg, const char** argv)
   std::cout << "  " <<  "sigma        : " << sigma << std::endl;
   std::cout << "  " <<  "eta0         : " << eta0 << std::endl;
   std::cout << "  " <<  "input_file   : " << input_file << std::endl;
-  std::cout << "  " <<  "output_codebook_file: " << output_prefix + ".<#>.codebook.tsv" << std::endl;
-  std::cout << "  " <<  "output_vector_file  : " << output_prefix + ".<#>.vector.tsv" << std::endl;  
+  std::cout << "  " <<  "output_vector_file  : " << output_prefix + ".<#>.tsv" << std::endl;  
   std::cout << "  " <<  "sep          : " << "\"" << sep << "\"" << std::endl;
   std::cout << "  " <<  "order        : " << order << std::endl;
   
@@ -325,13 +324,13 @@ int main(int narg, const char** argv)
 	count = 0;
 	tick = std::chrono::system_clock::now();
       }
-      std::cout << std::endl;
       const std::size_t M = std::min(m + batch_size, data.size());
       cv.update_batch(data.begin() + m, data.begin() + M, gen);
       count += M-m;
       cum_count += M-m;
     }
   }
+  std::cout << std::endl;  
   std::cout << "saving..." << std::endl;
   save(output_prefix, cv, codebooks);
   
