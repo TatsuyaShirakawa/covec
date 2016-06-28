@@ -134,7 +134,7 @@ namespace{
       "--sep, -s SEP='\t'                       : separator of each line in INPUT_FILE\n"
       "--help, -h                               : show this help message\n"
       ;
-      
+    bool input_file_found = false;
     for(int i=1; i<narg; ++i){
       if( match(argv[i], "--dim", "-d") ){
 	int x = std::stoi(argv[++i]);
@@ -161,6 +161,7 @@ namespace{
 	REQUIRED_POSITIVE(x, "eta0");
 	result.eta0 = x;
       }else if( match(argv[i], "--input_file", "-i") ){
+	input_file_found = true;
 	std::string x = argv[++i];
 	result.input_file = x;
       }else if( match(argv[i], "--sep", "-S") ){
@@ -178,6 +179,11 @@ namespace{
 	std::cerr << help_message << std::endl;
 	exit(1);
       }
+    }
+
+    if( !input_file_found ){
+      std::cerr << "input_file required" << std::endl;
+      exit(1);
     }
     return result;
   } // end of parse_args

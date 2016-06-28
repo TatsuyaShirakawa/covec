@@ -27,10 +27,10 @@ on the mat
 
 In the above sample, each line indicates a cooccurrences of elements (eg. ("the", "cat", "sat") cooccur).
 
-You can see the all options by puttting help options "-h" to covec.
+You can see the all options by putting help options "-h" to covec.
 
 ```bash
-usage: build/covec -i input_file [ options ]
+usage: covec -i input_file [ options ]
 Options and arguments:
 --dim, -d DIM=128                        : the dimension of vectors
 --batch_size, -b BATCH_SIZE=32           : BATCH_SIZE: the (mini)batch size
