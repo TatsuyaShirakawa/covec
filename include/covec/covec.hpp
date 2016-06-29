@@ -21,7 +21,7 @@ namespace covec{
     Covec(const std::vector<std::vector<std::size_t> >& each_counts,
 	  RandomGenerator& gen,
 	  const std::size_t dim=128,
-	  const double sigma=1.0e-1,	  
+	  const double sigma=1.0e-1,
 	  const std::size_t neg_size=1,
 	  const double eta0 = 5e-3 // learning rate
 	  )
@@ -39,11 +39,11 @@ namespace covec{
 
     template <class InputIterator, class RandomGenerator>
     Covec(const std::vector<std::pair<InputIterator, InputIterator> >& begs_and_ends,
-	  RandomGenerator& gen,	  
+	  RandomGenerator& gen,
 	  const std::size_t dim=128,
-	  const double sigma=1.0e-1,	  
+	  const double sigma=1.0e-1,
 	  const std::size_t neg_size=1,
-	  const double eta0 = 5e-3 // learning rate	  
+	  const double eta0 = 5e-3 // learning rate
 	  )
       : num_entries_(), dim_(), neg_size_(), eta0_()
       , vs_(), sqgs_()
@@ -60,16 +60,16 @@ namespace covec{
 
     template <class RandomGenerator>
     Covec(const std::vector<std::shared_ptr<DiscreteDistribution> >& probs,
-	  RandomGenerator& gen,	  
+	  RandomGenerator& gen,
 	  const std::size_t dim=128,
-	  const double sigma=1.0e-1,	  
+	  const double sigma=1.0e-1,
 	  const std::size_t neg_size=1,
-	  const double eta0 = 5e-3 // learning rate	  
+	  const double eta0 = 5e-3 // learning rate
 	  )
       : num_entries_(), dim_(), neg_size_(), eta0_()
       , vs_(), sqgs_()
     { this->initialize(probs, gen, dim, sigma, neg_size, eta0); }
-    
+
   public:
 
     template <class InputIterator, class RandomGenerator>
@@ -79,7 +79,7 @@ namespace covec{
 
     inline const std::size_t order() const
     { return this->num_entries_.size(); }
-    
+
     inline const std::vector<std::size_t>& num_entries() const
     { return this->num_entries_; }
 
@@ -91,7 +91,7 @@ namespace covec{
 
     inline const std::size_t neg_size() const
     { return this->neg_size_; }
-    
+
     inline const double eta0() const
     { return this->eta0_; }
 
@@ -109,11 +109,11 @@ namespace covec{
 
     template <class Grad, class InputIterator>
     void compute_positive_grad(Grad& grads, InputIterator beg, InputIterator end, std::size_t& pos_size);
-    
+
     template <class Grad, class RandomGenerator>
     void compute_negative_grad(Grad& grads, RandomGenerator& gen, std::size_t neg_size);
-    
-    
+
+
   private:
     std::vector<std::size_t> num_entries_; // order -> # of entries
     std::size_t dim_;
@@ -177,11 +177,11 @@ namespace covec{
     for(InputIterator itr = beg; itr != end; ++itr){
 
       ++pos_size;
-      
+
       assert(itr->size() == this->order());
       const auto& sample(*itr);
       assert( sample.size() == this->order() );
-      
+
       // compute Hadamard product, inner_product, sigmoid of inner_product
       std::vector<double> Hadamard_product(this->dimension(), 1.0);
       for(std::size_t i=0; i<this->order(); ++i){
@@ -214,7 +214,7 @@ namespace covec{
 
     } // end of process for positive sampling
   }
-    
+
   template <class Grad, class RandomGenerator>
   void Covec::compute_negative_grad(Grad& grads, RandomGenerator& gen, std::size_t neg_size)
   {
@@ -227,7 +227,7 @@ namespace covec{
 	sample[i] = prob(gen);
       }
       assert( sample.size() == this->order() );
-      
+
       // compute Hadamard product, inner_product, sigmoid of inner_product
       std::vector<double> Hadamard_product(this->dimension(), 1.0);
       for(std::size_t i=0; i<this->order(); ++i){
@@ -268,7 +268,7 @@ namespace covec{
     // accumulate gradients from positive samples
     std::size_t pos_size = 0;
     compute_positive_grad(grads, beg, end, pos_size);
-    
+
     // accumulate gradients from negative samples
     std::size_t neg_size = this->neg_size() * pos_size;
     compute_negative_grad(grads, gen, neg_size);
@@ -276,7 +276,7 @@ namespace covec{
     // update
     for(std::size_t i=0; i<this->order(); ++i){
       auto& sqgs_i = this->sqgs_[i];
-      auto& vs_i = this->vs_[i];      
+      auto& vs_i = this->vs_[i];
       // update sqgs, vs
       for(const auto& elem : grads[i]){
 	const auto j = elem.first;
@@ -292,8 +292,8 @@ namespace covec{
       }
 
     }
-    
-    
+
+
   } // end of update_batch
 
 } // end of namespace covec

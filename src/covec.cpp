@@ -68,7 +68,9 @@ namespace{
   bool load(std::vector<CodeBook>& codebooks,
 	    std::vector<std::vector<std::size_t> >& data,
 	    const std::string& input_file,
-	    const std::size_t order)
+	    const std::size_t order,
+	    const char sep
+	    )
   {
     codebooks.clear();
     codebooks.resize(2);
@@ -81,15 +83,20 @@ namespace{
 
     std::string line;
     while(std::getline(fin, line)){
-      std::stringstream sin;
-      sin << line;
+      std::size_t pos_from = 0, pos_to = 0;
       std::vector<std::size_t> instance(order);
-      for(std::size_t i=0; i<order; ++i){
-	std::string x;
-	sin >> x;
-	std::size_t code = codebooks[i].entry(x);
+      std::size_t i=0;
+      do{
+	pos_to = line.find_first_of(sep, pos_from);
+	std::size_t code = codebooks[i].entry(line.substr(pos_from, pos_to-pos_from));
 	instance[i] = code;
-      }
+	if(pos_to == std::string::npos){
+	  pos_from = std::string::npos;
+	}else{
+	  pos_from = pos_to + 1;
+	}
+	++i;
+      }while(pos_from != std::string::npos);
       data.push_back(instance);
     }
 
@@ -285,7 +292,7 @@ int main(int narg, const char** argv)
   std::vector<std::vector<std::size_t> > data;
   std::mt19937 gen(0);
   std::cout << "loading " << input_file << "..." << std::endl;;
-  load(codebooks, data, input_file, order);
+  load(codebooks, data, input_file, order, sep);
 
   std::cout << "data size: " << data.size() << std::endl;
   std::cout << "codebook sizes:" << std::endl;
