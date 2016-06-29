@@ -24,7 +24,7 @@ inline bool match(const std::string& s, const std::string& longarg, const std::s
       exit(1);								\
     }									\
   }									\
-  
+
 
 namespace{
 
@@ -72,7 +72,7 @@ namespace{
   {
     codebooks.clear();
     codebooks.resize(2);
-    
+
     std::ifstream fin(input_file.c_str());
     if(!fin || !fin.good()){
       std::cerr << "cannot open file: " << input_file << std::endl;
@@ -92,7 +92,7 @@ namespace{
       }
       data.push_back(instance);
     }
-    
+
     return true;
   }
 
@@ -224,7 +224,7 @@ namespace{
     // 	std::cerr << "cannot open output_codebook_file: " << output_file << std::endl;
     // 	exit(1);
     //   }
-      
+
     //   for(std::size_t j=0; j<codebooks[i].size(); ++j){
     // 	fout << j << "\t" << codebooks[i].decode(j) << "\n";
     //   }
@@ -239,7 +239,7 @@ namespace{
 	std::cerr << "cannot open output_vector_file: " << output_file << std::endl;
 	exit(1);
       }
-      
+
       for(std::size_t j=0; j<vs[i].size(); ++j){
 	fout << codebooks[i].decode(j);
 	for(std::size_t k=0; k<cv.dimension(); ++k){
@@ -248,7 +248,7 @@ namespace{
 	fout << "\n";
       }
     }
-    
+
   } // end of save
 
 } // end of anonymous namespace
@@ -277,17 +277,17 @@ int main(int narg, const char** argv)
   std::cout << "  " <<  "sigma        : " << sigma << std::endl;
   std::cout << "  " <<  "eta0         : " << eta0 << std::endl;
   std::cout << "  " <<  "input_file   : " << input_file << std::endl;
-  std::cout << "  " <<  "output_vector_file  : " << output_prefix + ".<#>.tsv" << std::endl;  
+  std::cout << "  " <<  "output_vector_file  : " << output_prefix + ".<#>.tsv" << std::endl;
   std::cout << "  " <<  "sep          : " << "\"" << sep << "\"" << std::endl;
   std::cout << "  " <<  "order        : " << order << std::endl;
-  
+
   std::vector<CodeBook> codebooks;
   std::vector<std::vector<std::size_t> > data;
   std::mt19937 gen(0);
   std::cout << "loading " << input_file << "..." << std::endl;;
   load(codebooks, data, input_file, order);
 
-  std::cout << "data size: " << data.size() << std::endl;  
+  std::cout << "data size: " << data.size() << std::endl;
   std::cout << "codebook sizes:" << std::endl;
   for(std::size_t i=0; i<order; ++i){
     std::cout << "  " << i << ": " << codebooks[i].size() << std::endl;
@@ -309,7 +309,7 @@ int main(int narg, const char** argv)
     std::srand(gen());
     std::random_shuffle(data.begin(), data.end());
     for(std::size_t m=0; m < data.size(); m += batch_size){
-      
+
       if(count >= every_count){ // reporting
 	auto tack = std::chrono::system_clock::now();
 	auto millisec = std::chrono::duration_cast<std::chrono::milliseconds>(tack - tick).count();
@@ -330,10 +330,10 @@ int main(int narg, const char** argv)
       cum_count += M-m;
     }
   }
-  std::cout << std::endl;  
+  std::cout << std::endl;
   std::cout << "saving..." << std::endl;
   save(output_prefix, cv, codebooks);
-  
+
   return 0;
 }
 

@@ -63,9 +63,9 @@ namespace covec{
 	probabilities_.push_back(value);
 	Z += value;
       }
-      
+
       assert( Z > 0 );
-      
+
       for(std::size_t i=0; i<probabilities_.size(); ++i){
 	probabilities_[i] /= Z;
       }

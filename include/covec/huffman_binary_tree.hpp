@@ -5,6 +5,7 @@
 
 #include <memory>
 #include <vector>
+#include <queue>
 
 
 namespace covec{
@@ -18,36 +19,44 @@ namespace covec{
   private:
     typedef Node<value_type> self_type;
   public:
-    Node(): left_(nullptr), right_(nullptr), key_(nullptr), value_(nullptr)
-    {}
-	
-    Node(const key_type& key, const value_type& value)
-      : left_(nullptr), right_(nullptr)
-      , key_(new key_type(key)), value_(new value_type(value))
+
+    Node() noexcept: left_(nullptr), right_(nullptr), key_(nullptr), value_(0)
     {}
 
-    Node(std::unique_ptr<const self_type>& left,
-	 std::unique_ptr<const self_type>& right)
-      : left_(std::move(left)), right_(std::move(right))
-      , key_(nullptr), value_(new value_type(this->left_->value() + this->right_->value()))
+    Node(const key_type& key, const value_type& value) noexcept
+      : left_(nullptr), right_(nullptr)
+      , key_(new key_type(key)), value_(value)
+    {}
+
+    Node(const Node* left, const Node* right)
+      : left_(left), right_(right)
+      , key_(nullptr), value_(left->value_ + right->value_)
     {}
 
   public:
 
     // elemental APIs
-    inline bool is_leaf() const { return !left_ && !right_ && key_ && value_; }
+    inline bool is_leaf() const { return key_ != nullptr; }
     inline const Node& left() const { return *left_; }
     inline const Node& right() const { return *right_; }
     inline const key_type& key() const { return *key_; }
-    inline const value_type& value() const { return *value_; }
-      
+    inline const value_type& value() const { return value_; }
+
   private:
     std::unique_ptr<const Node> left_;
     std::unique_ptr<const Node> right_;
     std::unique_ptr<const key_type> key_;
-    std::unique_ptr<const value_type> value_;
+    value_type value_;
 
   }; // end of Node
+
+  template <class node_ptr>
+  struct node_ptr_compare
+  {
+    // ascending order
+    inline bool operator()(node_ptr n1, node_ptr n2) const
+    { return n1->value() > n2->value(); }
+  };
 
   /**
    * Create Huffman binary tree from values
@@ -56,58 +65,40 @@ namespace covec{
   std::unique_ptr<const Node<V> >
   create_Huffman_binary_tree(InputIterator beg, InputIterator end)
   {
+
     typedef V value_type;
     typedef Node<V> node_type;
-    
+
     assert( beg != end );
 
-    // [Huffman Tree]
     // 1. create nodes from thetas
-    // 2. sort nodes by descending order of values
-    // 3. until nodes.size() > 1:
-    //   3-1. merge last two nodes into anew node
-    //   3-2. sort nodes by descending order of values
-    // 4. root = nodes[0]
-
-    // 1. create nodes from thetas
-    std::vector<std::unique_ptr<const node_type> > nodes;
+    std::vector<const node_type*> nodes;
     value_type Z = 0;
     std::size_t i=0;
     for(InputIterator itr=beg; itr!=end; ++itr){
       value_type value = *itr;
-      nodes.push_back(std::make_unique<const node_type>(i, value));
+      nodes.push_back(new node_type(i, value));
       Z += value;
       ++i;
     }
     assert( Z > 0 );
 
-    // 2. sort nodes by descending order of values
-    std::sort(nodes.begin(), nodes.end()
-	      , [](const std::unique_ptr<const node_type>& n1,
-		   const std::unique_ptr<const node_type>& n2)
-	      { return n1->value() > n2->value(); });
+    std::priority_queue<const node_type*, std::vector<const node_type*>, node_ptr_compare<const node_type*> >
+      pq(nodes.begin(), nodes.end());
 
     // 3. until nodes.size() > 1
-    while(nodes.size() > 1){
-      // merge last two nodes into a new node	
-      std::size_t N = nodes.size();
-      auto n1 = std::move(nodes.back()); nodes.pop_back();
-      auto n2 = std::move(nodes.back()); nodes.pop_back();
-      auto n = std::make_unique<const node_type>(n1, n2);
-      nodes.push_back(std::move(n));
-      // sort nodes by descending order of values
-      std::size_t n_pos = N-2;
-      auto value = nodes.back()->value();
-      while( n_pos > 0 && value > nodes[n_pos-1]->value() ){
-	nodes[n_pos].swap(nodes[n_pos-1]);
-	//	std::swap(nodes[n_pos], nodes[n_pos-1]);
-	--n_pos;
-      }
+    std::size_t N=nodes.size();
+    while(N > 1){
+      auto n1 = pq.top(); pq.pop();
+      auto n2 = pq.top(); pq.pop();
+      assert( n1->value() <= n2->value() );
+      pq.push(new node_type(n1, n2));
+      --N;
     }
+    return std::unique_ptr<const node_type>(pq.top());
 
-    return std::move(nodes[0]);
   } // end of create_Huffman_binary_tree
-    
+
   /**
    * Create Huffman binary tree from values
    */
@@ -118,6 +109,6 @@ namespace covec{
     return
       create_Huffman_binary_tree<double, typename std::vector<V>::const_iterator>
       (values.cbegin(), values.cend());
-  }				      
+  }
 
 } // end of covec
