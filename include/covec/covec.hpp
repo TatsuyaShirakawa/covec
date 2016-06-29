@@ -23,10 +23,11 @@ namespace covec{
 	  const std::size_t dim=128,
 	  const double sigma=1.0e-1,
 	  const std::size_t neg_size=1,
-	  const double eta0 = 5e-3 // learning rate
+	  const double eta0 = 5e-3, // initial learning rate
+	  const double eta1 = 1e-5 // final learning rate
 	  )
-      : num_entries_(), dim_(), neg_size_(), eta0_()
-      , vs_(), sqgs_()
+      : num_entries_(), dim_(), neg_size_(), eta0_(), eta1_()
+      , vs_(), cs_()
     {
       std::vector<std::shared_ptr<DiscreteDistribution> > probs;
       for(const auto& counts : each_counts){
@@ -34,7 +35,7 @@ namespace covec{
 	probs.push_back(prob);
       }
 
-      this->initialize(probs, gen, dim, sigma, neg_size, eta0);
+      this->initialize(probs, gen, dim, sigma, neg_size, eta0, eta1);
     }
 
     template <class InputIterator, class RandomGenerator>
@@ -43,10 +44,11 @@ namespace covec{
 	  const std::size_t dim=128,
 	  const double sigma=1.0e-1,
 	  const std::size_t neg_size=1,
-	  const double eta0 = 5e-3 // learning rate
+	  const double eta0 = 5e-3, // learning rate
+	  const double eta1 = 1e-5 // final learning rate
 	  )
-      : num_entries_(), dim_(), neg_size_(), eta0_()
-      , vs_(), sqgs_()
+      : num_entries_(), dim_(), neg_size_(), eta0_(), eta1_()
+      , vs_(), cs_()
     {
       std::vector<std::shared_ptr<DiscreteDistribution> > probs;
       for(const auto&& beg_and_end : begs_and_ends){
@@ -55,7 +57,7 @@ namespace covec{
 	probs.push_back(prob);
       }
 
-      this->initialize(probs, gen, dim, sigma, neg_size, eta0);
+      this->initialize(probs, gen, dim, sigma, neg_size, eta0, eta1);
     }
 
     template <class RandomGenerator>
@@ -64,11 +66,12 @@ namespace covec{
 	  const std::size_t dim=128,
 	  const double sigma=1.0e-1,
 	  const std::size_t neg_size=1,
-	  const double eta0 = 5e-3 // learning rate
+	  const double eta0 = 5e-3, // learning rate
+	  const double eta1 = 1e-5 // final learning rate
 	  )
       : num_entries_(), dim_(), neg_size_(), eta0_()
-      , vs_(), sqgs_()
-    { this->initialize(probs, gen, dim, sigma, neg_size, eta0); }
+      , vs_(), cs_()
+    { this->initialize(probs, gen, dim, sigma, neg_size, eta0, eta1); }
 
   public:
 
@@ -97,13 +100,20 @@ namespace covec{
 
   private:
 
+    //    constexpr static std::size_t SCALE = (1 << 16);
+    constexpr static int SCALE = 1024;
+    constexpr static double MAX_VALUE = 20.0;
+
+    void init_sig_table();
+
     template <class RandomGenerator>
     void initialize(const std::vector<std::shared_ptr<DiscreteDistribution> >& probs,
 		    RandomGenerator& gen,
 		    const std::size_t dim=128,
 		    const double sigma=1.0e-1,
 		    const std::size_t neg_size=1,
-		    const double eta0=5e-3
+		    const double eta0=5e-3,
+		    const double eta1=1e-5
 		    );
 
 
@@ -119,9 +129,11 @@ namespace covec{
     std::size_t dim_;
     std::size_t neg_size_;
     double eta0_;
+    double eta1_;
     std::vector<std::shared_ptr<DiscreteDistribution> > probs_;
     std::vector<std::vector<std::vector<double> > > vs_; // order -> entry -> dim -> value
-    std::vector<std::vector<std::vector<double> > > sqgs_; // order -> entry -> dim -> squared gradient
+    std::vector<std::vector<std::size_t> > cs_; // counts of occurrencees
+
   }; // end of Covectorizer
 
   // -------------------------------------------------------------------------------
@@ -132,21 +144,23 @@ namespace covec{
 			 const std::size_t dim,
 			 const double sigma,
 			 const std::size_t neg_size,
-			 const double eta0
+			 const double eta0,
+			 const double eta1
 			 )
   {
-    probs_ = probs;
-    dim_ = dim;
-    neg_size_ = neg_size;
-    eta0_ = eta0;
+    this->probs_ = probs;
+    this->dim_ = dim;
+    this->neg_size_ = neg_size;
+    this->eta0_ = eta0;
+    this->eta1_ = eta0;
 
-    num_entries_.clear();
-    vs_.clear();
-    sqgs_.clear();
+    this->num_entries_.clear();
+    this->vs_.clear();
+    this->cs_.clear();
 
-    std::size_t order = probs_.size();
-    vs_.resize(order);
-    sqgs_.resize(order);
+    std::size_t order = this->probs_.size();
+    this->vs_.resize(order);
+    this->cs_.resize(order);
 
     std::normal_distribution<double> normal(0.0, sigma);
     for(std::size_t i=0; i<order; ++i){
@@ -154,9 +168,8 @@ namespace covec{
       num_entries_.push_back(prob->probabilities().size());
 
       std::size_t num_entries = prob->probabilities().size();
-      std::vector<std::vector<double> > vs(num_entries),
-	sqgs(num_entries, std::vector<double>(this->dim_, 0.0));
-      
+      std::vector<std::vector<double> > vs(num_entries);
+
       for(std::size_t j=0; j < num_entries; ++j){
 	std::vector<double> v(this->dim_);
 	for(std::size_t k=0; k<this->dim_; ++k){
@@ -165,8 +178,8 @@ namespace covec{
 	vs[j] = v;
       }
 
-      vs_[i] = vs;
-      sqgs_[i] = sqgs;
+      this->vs_[i] = vs;
+      this->cs_[i] = std::vector<std::size_t>(num_entries, 0);
     }
   }
 
@@ -182,10 +195,12 @@ namespace covec{
       const auto& sample(*itr);
       assert( sample.size() == this->order() );
 
+      // count the occurences and 
       // compute Hadamard product, inner_product, sigmoid of inner_product
       std::vector<double> Hadamard_product(this->dimension(), 1.0);
       for(std::size_t i=0; i<this->order(); ++i){
 	const auto j = sample[i];
+	++this->cs_[i][j];
 	const auto& v = this->vs_[i][j];
 	assert( v.size() == this->dimension() );
 	for(std::size_t k = 0; k < this->dimension(); ++k){
@@ -220,11 +235,13 @@ namespace covec{
   {
     for(std::size_t neg_count=0; neg_count < neg_size; ++neg_count){
 
-      // negative sampling
+      // negative sampling and
+      // count the occurences
       std::vector<std::size_t> sample(this->order());
       for(std::size_t i=0; i<this->order(); ++i){
 	const auto& prob(*this->probs_[i]);
 	sample[i] = prob(gen);
+	++this->cs_[i][sample[i]];
       }
       assert( sample.size() == this->order() );
 
@@ -275,18 +292,17 @@ namespace covec{
 
     // update
     for(std::size_t i=0; i<this->order(); ++i){
-      auto& sqgs_i = this->sqgs_[i];
       auto& vs_i = this->vs_[i];
+      const auto& cs_i = this->cs_[i];
       // update sqgs, vs
       for(const auto& elem : grads[i]){
 	const auto j = elem.first;
 	const auto& g = elem.second;
-	auto& sqgs_ij = sqgs_i[j];
 	auto& vs_ij = vs_i[j];
 	for(std::size_t k=0; k<this->dimension(); ++k){
 	  if(g[k] != 0){
-	    sqgs_ij[k] += g[k] * g[k];
-	    vs_ij[k] += this->eta0_ * g[k] / std::sqrt(sqgs_ij[k]);
+	    double eta = std::max(this->eta0_ / cs_i[j], this->eta1_);
+	    vs_ij[k] += eta * g[k];
 	  }
 	}
       }

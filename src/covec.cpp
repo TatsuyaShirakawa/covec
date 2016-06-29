@@ -107,7 +107,7 @@ namespace{
   {
     Config()
       : order(2), dim(128), batch_size(32), num_epochs(1)
-      , neg_size(1), sigma(1.0e-1), eta0(5e-3)
+      , neg_size(1), sigma(1.0e-1), eta0(5e-3), eta1(1e-5)
       , input_file(), output_prefix("result"), sep('\t')
     {}
 
@@ -118,6 +118,7 @@ namespace{
     std::size_t neg_size;
     double sigma;
     double eta0;
+    double eta1;
     std::string input_file;
     std::string output_prefix;
     char sep;
@@ -135,7 +136,8 @@ namespace{
       "--num_epochs, -n NUM_EPOCHS=1            : NUM_EPOCHS: the number of epochs\n"
       "--neg_size, -N NEGSIZE=1                 : the size of negative sampling\n"
       "--sigma, -s SIGMA=0.1                    : initialize each element of vector with Normal(0, SIGMA)\n"
-      "--eta0, -e ETA0=0.005                    : initial learning rate for AdaGrad\n"
+      "--eta0, -e ETA0=0.005                    : initial learning rate for SGD\n"
+      "--eta1, -E ETA1=0.005                    : final learning rate for SGD\n"
       "--input_file, -i INPUT_FILE              : input file. supposed that each line is separated by SEP\n"
       "--output_prefix, -o OUTPUT_PREFIX=\"vec\": output file prefix\n"
       "--sep, -s SEP='\t'                       : separator of each line in INPUT_FILE\n"
@@ -271,6 +273,7 @@ int main(int narg, const char** argv)
   const std::size_t neg_size = config.neg_size;
   const double sigma = config.sigma;
   const double eta0 = config.eta0;
+  const double eta1 = config.eta1;
   const std::string input_file = config.input_file;
   const std::string output_prefix = config.output_prefix;
   const char sep = config.sep;
@@ -283,6 +286,7 @@ int main(int narg, const char** argv)
   std::cout << "  " <<  "neg_size     : " << neg_size << std::endl;
   std::cout << "  " <<  "sigma        : " << sigma << std::endl;
   std::cout << "  " <<  "eta0         : " << eta0 << std::endl;
+  std::cout << "  " <<  "eta1         : " << eta1 << std::endl;
   std::cout << "  " <<  "input_file   : " << input_file << std::endl;
   std::cout << "  " <<  "output_vector_file  : " << output_prefix + ".<#>.tsv" << std::endl;
   std::cout << "  " <<  "sep          : " << "\"" << sep << "\"" << std::endl;
@@ -308,7 +312,7 @@ int main(int narg, const char** argv)
 		     );
   }
   std::cout << "creating covec..." << std::endl;
-  Covec cv(probs, gen, dim, sigma, neg_size, eta0);
+  Covec cv(probs, gen, dim, sigma, neg_size, eta0, eta1);
 
   std::size_t count = 0, cum_count = 0, every_count = 10000;
   auto tick = std::chrono::system_clock::now();
