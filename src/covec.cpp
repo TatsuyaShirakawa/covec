@@ -192,6 +192,7 @@ namespace{
 
     if( !input_file_found ){
       std::cerr << "input_file required" << std::endl;
+      std::cout << help_message << std::endl;
       exit(1);
     }
     return result;

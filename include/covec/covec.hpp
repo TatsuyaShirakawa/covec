@@ -104,8 +104,6 @@ namespace covec{
     constexpr static int SCALE = 1024;
     constexpr static double MAX_VALUE = 20.0;
 
-    void init_sig_table();
-
     template <class RandomGenerator>
     void initialize(const std::vector<std::shared_ptr<DiscreteDistribution> >& probs,
 		    RandomGenerator& gen,

@@ -15,7 +15,7 @@ namespace covec{
   public:
     typedef std::size_t result_type;
   private:
-    typedef Node<double> node_type;
+    typedef Node node_type;
   public:
 
     template <class InputIterator>
@@ -53,7 +53,7 @@ namespace covec{
   private:
 
     template <class InputIterator>
-    void set_probabilities(InputIterator beg, InputIterator end)
+    inline void set_probabilities(InputIterator beg, InputIterator end)
     {
       probabilities_.clear();
       double Z = 0.0;

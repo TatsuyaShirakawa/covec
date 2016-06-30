@@ -10,25 +10,24 @@
 
 namespace covec{
 
-  template <class V=double>
   struct Node
   {
   public:
     typedef std::size_t key_type;
-    typedef V value_type;
+    typedef double value_type;
   private:
-    typedef Node<value_type> self_type;
+    typedef Node self_type;
   public:
 
-    Node() noexcept: left_(nullptr), right_(nullptr), key_(nullptr), value_(0)
+    Node(): left_(nullptr), right_(nullptr), key_(nullptr), value_(0)
     {}
 
-    Node(const key_type& key, const value_type& value) noexcept
+    Node(const key_type& key, const value_type& value)
       : left_(nullptr), right_(nullptr)
       , key_(new key_type(key)), value_(value)
     {}
 
-    Node(const Node* left, const Node* right)
+    Node(const self_type* left, const self_type* right)
       : left_(left), right_(right)
       , key_(nullptr), value_(left->value_ + right->value_)
     {}
@@ -37,14 +36,14 @@ namespace covec{
 
     // elemental APIs
     inline bool is_leaf() const { return key_ != nullptr; }
-    inline const Node& left() const { return *left_; }
-    inline const Node& right() const { return *right_; }
+    inline const self_type& left() const { return *left_; }
+    inline const self_type& right() const { return *right_; }
     inline const key_type& key() const { return *key_; }
     inline const value_type& value() const { return value_; }
 
   private:
-    std::unique_ptr<const Node> left_;
-    std::unique_ptr<const Node> right_;
+    std::unique_ptr<const self_type> left_;
+    std::unique_ptr<const self_type> right_;
     std::unique_ptr<const key_type> key_;
     value_type value_;
 
@@ -61,13 +60,13 @@ namespace covec{
   /**
    * Create Huffman binary tree from values
    */
-  template <class V=double, class InputIterator>
-  std::unique_ptr<const Node<V> >
+  template <class InputIterator>
+  inline std::unique_ptr<const Node >
   create_Huffman_binary_tree(InputIterator beg, InputIterator end)
   {
 
-    typedef V value_type;
-    typedef Node<V> node_type;
+    typedef Node node_type;
+    typedef typename Node::value_type value_type;
 
     assert( beg != end );
 
@@ -102,12 +101,12 @@ namespace covec{
   /**
    * Create Huffman binary tree from values
    */
-  template <class V=double>
-  std::unique_ptr<const Node<V> >
-  create_Huffman_binary_tree(const std::vector<V>& values)
+  template <class InputContainer>
+  inline std::unique_ptr<const Node >
+  create_Huffman_binary_tree(const InputContainer& values)
   {
     return
-      create_Huffman_binary_tree<double, typename std::vector<V>::const_iterator>
+      create_Huffman_binary_tree<typename InputContainer::const_iterator>
       (values.cbegin(), values.cend());
   }
 
