@@ -96,7 +96,17 @@ namespace{
 	  pos_from = pos_to + 1;
 	}
 	++i;
+	if(i > order){
+	  std::cerr << "too many entries in a line: " << line << std::endl;
+	  exit(1);
+	}
       }while(pos_from != std::string::npos);
+      if(i < order){
+	if(i > order){
+	  std::cerr << "too few entries in a line: " << line << std::endl;
+	  exit(1);
+	}
+      }
       data.push_back(instance);
     }
 

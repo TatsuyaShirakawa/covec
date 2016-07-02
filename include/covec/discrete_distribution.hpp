@@ -42,10 +42,14 @@ namespace covec{
     inline std::size_t operator()( Generator& g ) const
     {
       const node_type* n = root_.get();
+      double x = std::uniform_real_distribution<double>(0., n->value())(g);
       while(!n->is_leaf()){
-	double lv(n->left().value()), rv(n->right().value());
-	double x = std::uniform_real_distribution<double>(0., lv+rv)(g);
+	const double lv = n->left().value();
 	n = (x <= lv)? &n->left() : &n->right();
+	if( x > lv ){
+	  x -= lv;
+	  assert( 0 <= x && x <= n->value() );
+	}
       }
       return n->key();
     }

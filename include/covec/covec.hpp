@@ -20,9 +20,9 @@ namespace covec{
     template <class RandomGenerator>
     Covec(const std::vector<std::vector<std::size_t> >& each_counts,
 	  RandomGenerator& gen,
-	  const std::size_t dim=128,
-	  const double sigma=1.0e-1,
-	  const std::size_t neg_size=1,
+	  const std::size_t dim = 128,
+	  const double sigma = 1.0e-1,
+	  const std::size_t neg_size = 1,
 	  const double eta0 = 5e-3, // initial learning rate
 	  const double eta1 = 1e-5 // final learning rate
 	  )
@@ -41,9 +41,9 @@ namespace covec{
     template <class InputIterator, class RandomGenerator>
     Covec(const std::vector<std::pair<InputIterator, InputIterator> >& begs_and_ends,
 	  RandomGenerator& gen,
-	  const std::size_t dim=128,
-	  const double sigma=1.0e-1,
-	  const std::size_t neg_size=1,
+	  const std::size_t dim = 128,
+	  const double sigma = 1.0e-1,
+	  const std::size_t neg_size = 1,
 	  const double eta0 = 5e-3, // learning rate
 	  const double eta1 = 1e-5 // final learning rate
 	  )
@@ -63,9 +63,9 @@ namespace covec{
     template <class RandomGenerator>
     Covec(const std::vector<std::shared_ptr<DiscreteDistribution> >& probs,
 	  RandomGenerator& gen,
-	  const std::size_t dim=128,
-	  const double sigma=1.0e-1,
-	  const std::size_t neg_size=1,
+	  const std::size_t dim = 128,
+	  const double sigma = 1.0e-1,
+	  const std::size_t neg_size = 1,
 	  const double eta0 = 5e-3, // learning rate
 	  const double eta1 = 1e-5 // final learning rate
 	  )
@@ -98,29 +98,30 @@ namespace covec{
     inline const double eta0() const
     { return this->eta0_; }
 
-  private:
-
-    //    constexpr static std::size_t SCALE = (1 << 16);
-    constexpr static int SCALE = 1024;
-    constexpr static double MAX_VALUE = 20.0;
+  public:
 
     template <class RandomGenerator>
     void initialize(const std::vector<std::shared_ptr<DiscreteDistribution> >& probs,
 		    RandomGenerator& gen,
-		    const std::size_t dim=128,
-		    const double sigma=1.0e-1,
-		    const std::size_t neg_size=1,
-		    const double eta0=5e-3,
-		    const double eta1=1e-5
+		    const std::size_t dim = 128,
+		    const double sigma = 1.0e-1,
+		    const std::size_t neg_size = 1,
+		    const double eta0 = 5e-3,
+		    const double eta1 = 1e-5
 		    );
 
+  private:
 
-    template <class Grad, class InputIterator>
-    void compute_positive_grad(Grad& grads, InputIterator beg, InputIterator end, std::size_t& pos_size);
+    typedef enum { POSITIVE, NEGATIVE } POS_NEG;
 
-    template <class Grad, class RandomGenerator>
-    void compute_negative_grad(Grad& grads, RandomGenerator& gen, std::size_t neg_size);
+    template <class Grad>
+    void accumulate_grad(Grad& grads, const std::vector<std::size_t>& sample
+			 , const POS_NEG pos_neg);
 
+    // in case order == 2
+    template <class Grad>
+    void accumulate_grad_2(Grad& grads, const std::vector<std::size_t>& sample
+			   , const POS_NEG pos_neg);
 
   private:
     std::vector<std::size_t> num_entries_; // order -> # of entries
@@ -161,117 +162,99 @@ namespace covec{
     this->cs_.resize(order);
 
     std::normal_distribution<double> normal(0.0, sigma);
-    for(std::size_t i=0; i<order; ++i){
-      const auto& prob = probs_[i];
-      num_entries_.push_back(prob->probabilities().size());
-
+    for(std::size_t i = 0; i < order; ++i){
+      const auto& prob = this->probs_[i];
+      this->num_entries_.push_back(prob->probabilities().size());
       std::size_t num_entries = prob->probabilities().size();
-      std::vector<std::vector<double> > vs(num_entries);
-
-      for(std::size_t j=0; j < num_entries; ++j){
+      auto& vs = this->vs_[i];
+      vs.resize(num_entries);
+      for(std::size_t j = 0; j < num_entries; ++j){
 	std::vector<double> v(this->dim_);
-	for(std::size_t k=0; k<this->dim_; ++k){
+	for(std::size_t k = 0, K = this->dimension(); k < K; ++k){
 	  v[k] = normal(gen);
 	}
 	vs[j] = v;
       }
 
-      this->vs_[i] = vs;
       this->cs_[i] = std::vector<std::size_t>(num_entries, 0);
     }
   }
 
-  template <class Grad, class InputIterator>
-  void Covec::compute_positive_grad(Grad& grads, InputIterator beg, InputIterator end, std::size_t& pos_size)
+  template <class Grad>
+  void Covec::accumulate_grad(Grad& grads
+			      , const std::vector<std::size_t>& sample
+			      , Covec::POS_NEG pos_neg)
   {
-    pos_size = 0;
-    for(InputIterator itr = beg; itr != end; ++itr){
+    assert( sample.size() == this->order() );
 
-      ++pos_size;
+    if( this->order() == 2 ){
+      return accumulate_grad_2(grads, sample, pos_neg);
+    }
 
-      assert(itr->size() == this->order());
-      const auto& sample(*itr);
-      assert( sample.size() == this->order() );
-
-      // count the occurences and 
-      // compute Hadamard product, inner_product, sigmoid of inner_product
-      std::vector<double> Hadamard_product(this->dimension(), 1.0);
-      for(std::size_t i=0; i<this->order(); ++i){
-	const auto j = sample[i];
-	++this->cs_[i][j];
-	const auto& v = this->vs_[i][j];
-	assert( v.size() == this->dimension() );
-	for(std::size_t k = 0; k < this->dimension(); ++k){
-	  Hadamard_product[k] *= v[k];
-	}
+    // count the occurences and
+    // compute Hadamard product, inner_product, sigmoid of inner_product
+    std::vector<double> Hadamard_product(this->dimension(), 1.0);
+    for(std::size_t i = 0, I = this->order(); i < I; ++i){
+      const auto j = sample[i];
+      ++this->cs_[i][j];
+      const auto& v = this->vs_[i][j];
+      assert( v.size() == this->dimension() );
+      for(std::size_t k = 0, K = this->dimension(); k < K; ++k){
+	Hadamard_product[k] *= v[k];
       }
-      double inner_product = std::accumulate(Hadamard_product.begin(), Hadamard_product.end(), 0.0);
-      double sigmoid = 1.0 / ( 1 + std::exp(-inner_product) );
-
-      // compute gradients
-      for(std::size_t i=0; i<this->order(); ++i){
-	const auto& j = sample[i];
-	const auto& v = this->vs_[i][j];
-	auto itr = grads[i].find(j);
-	if(itr == grads[i].end()){
-	  auto ret = grads[i].insert(std::make_pair(j, std::vector<double>(this->dimension(), 0.0)));
-	  itr = ret.first;
-	}
-	//	std::vector<double>& g = grads[i][j];
-	std::vector<double>& g = itr->second;
-	for(std::size_t k=0; k < this->dimension(); ++k){
-	  if( Hadamard_product[k] == 0 ){ continue; }
-	  g[k] += (1-sigmoid) * Hadamard_product[k] / v[k];
-	}
+    }
+    double inner_product = std::accumulate(Hadamard_product.begin(), Hadamard_product.end(), 0.0);
+    double sigmoid = 1.0 / ( 1 + std::exp(-inner_product) );
+    double coeff = (pos_neg == POSITIVE? 1-sigmoid : -sigmoid);
+    // compute gradients
+    for(std::size_t i = 0, I = this->order(); i < I; ++i){
+      const auto& j = sample[i];
+      const auto& v = this->vs_[i][j];
+      auto& grads_i = grads[i];
+      auto itr = grads_i.find(j);
+      if(itr == grads_i.end()){
+	auto ret = grads_i.insert(std::make_pair(j, std::vector<double>(this->dimension(), 0.0)));
+	itr = ret.first;
       }
-
-    } // end of process for positive sampling
+      std::vector<double>& g = itr->second;
+      for(std::size_t k = 0, K = this->dimension(); k < K; ++k){
+	if( Hadamard_product[k] == 0 ){ continue; }
+	g[k] += coeff * Hadamard_product[k] / v[k];
+      }
+    }
   }
 
-  template <class Grad, class RandomGenerator>
-  void Covec::compute_negative_grad(Grad& grads, RandomGenerator& gen, std::size_t neg_size)
+  template <class Grad>
+  void Covec::accumulate_grad_2(Grad& grads
+				, const std::vector<std::size_t>& sample
+				, Covec::POS_NEG pos_neg)
   {
-    for(std::size_t neg_count=0; neg_count < neg_size; ++neg_count){
+    assert( sample.size() == 2 && this->order() == 2 );
 
-      // negative sampling and
-      // count the occurences
-      std::vector<std::size_t> sample(this->order());
-      for(std::size_t i=0; i<this->order(); ++i){
-	const auto& prob(*this->probs_[i]);
-	sample[i] = prob(gen);
-	++this->cs_[i][sample[i]];
+    // count the occurences and
+    // compute Hadamard product, inner_product, sigmoid of inner_product
+    const auto& v0 = this->vs_[0][sample[0]];
+    const auto& v1 = this->vs_[1][sample[1]];
+    const double inner_product =
+      std::inner_product(v0.begin(), v0.end(), v1.begin(), 0.0);
+    double sigmoid = 1.0 / ( 1 + std::exp(-inner_product) );
+    double coeff = (pos_neg == POSITIVE? 1-sigmoid : -sigmoid);
+
+    for(std::size_t i = 0; i < 2; ++i){
+      const std::size_t j = sample[i];
+      ++this->cs_[i][j];
+      auto& grads_i = grads[i];
+      auto itr = grads_i.find(j);
+      if(itr == grads_i.end()){
+	auto ret = grads_i.insert(std::make_pair(j, std::vector<double>(this->dimension(), 0.0)));
+	itr = ret.first;
       }
-      assert( sample.size() == this->order() );
-
-      // compute Hadamard product, inner_product, sigmoid of inner_product
-      std::vector<double> Hadamard_product(this->dimension(), 1.0);
-      for(std::size_t i=0; i<this->order(); ++i){
-	const auto j = sample[i];
-	const auto& v = this->vs_[i][j];
-	for(std::size_t k = 0; k < this->dimension(); ++k){
-	  Hadamard_product[k] *= v[k];
-	}
+      auto& g = itr->second;
+      const auto& v = (i == 0 ? v1 : v0);
+      for(std::size_t k = 0, K = this->dimension(); k < K; ++k){
+	g[k] += coeff * v[k];
       }
-      double inner_product = std::accumulate(Hadamard_product.begin(), Hadamard_product.end(), 0.0);
-      double sigmoid = 1.0 / ( 1 + std::exp(-inner_product) );
-
-      // compute gradients
-      for(std::size_t i=0; i<this->order(); ++i){
-	const auto& j = sample[i];
-	const auto& v = this->vs_[i][j];
-	auto itr = grads[i].find(j);
-	if(itr == grads[i].end()){
-	  auto ret = grads[i].insert(std::make_pair(j, std::vector<double>(this->dimension(), 0.0)));
-	  itr = ret.first;
-	}
-	std::vector<double>& g = itr->second;
-	for(std::size_t k=0; k < this->dimension(); ++k){
-	  if( Hadamard_product[k] == 0 ){ continue; }
-	  g[k] -= sigmoid * Hadamard_product[k] / v[k];
-	}
-      }
-
-    } // end of process for negative sampling
+    }
   }
 
 
@@ -282,25 +265,43 @@ namespace covec{
 
     // accumulate gradients from positive samples
     std::size_t pos_size = 0;
-    compute_positive_grad(grads, beg, end, pos_size);
+    for(auto itr = beg; itr != end; ++itr){
+      ++pos_size;
+      accumulate_grad(grads, *itr, POSITIVE);
+    }
 
-    // accumulate gradients from negative samples
-    std::size_t neg_size = this->neg_size() * pos_size;
-    compute_negative_grad(grads, gen, neg_size);
+    // generate negative_sample
+    // and accumulate its gradient
+    std::vector<std::size_t> negative(this->order());
+    for(std::size_t m = 0, M = pos_size * this->neg_size(); m < M; ++m){
+      for(std::size_t i = 0, I = this->order(); i < I; ++i){
+	std::size_t j = this->probs_[i]->operator()(gen);
+	negative[i] = j;
+	++this->cs_[i][j];
+      }
+      accumulate_grad(grads, negative, NEGATIVE);
+    }
 
     // update
-    for(std::size_t i=0; i<this->order(); ++i){
+    for(std::size_t i = 0, I = this->order(); i < I; ++i){
       auto& vs_i = this->vs_[i];
       const auto& cs_i = this->cs_[i];
+      const auto& grad_i = grads[i];
       // update sqgs, vs
-      for(const auto& elem : grads[i]){
+      for(const auto& elem : grad_i){
 	const auto j = elem.first;
-	const auto& g = elem.second;
+	const auto& grad_ij = elem.second;
 	auto& vs_ij = vs_i[j];
-	for(std::size_t k=0; k<this->dimension(); ++k){
-	  if(g[k] != 0){
-	    double eta = std::max(this->eta0_ / cs_i[j], this->eta1_);
-	    vs_ij[k] += eta * g[k];
+	for(std::size_t k = 0, K = this->dimension(); k < K; ++k){
+	  const double grad_ijk = grad_ij[k];
+	  if(grad_ijk != 0){
+	    const double cs_ij = cs_i[j];
+	    double eta = (this->eta0_ > this->eta1_ * cs_ij ?
+			  this->eta0_ / cs_ij : this->eta1_);
+	    // if( this->eta0_ > this->eta1_ * cs_ij ){
+	    // }
+	    // double eta = std::max(this->eta0_ / cs_i[j], this->eta1_);
+	    vs_ij[k] += eta * grad_ijk;
 	  }
 	}
       }
