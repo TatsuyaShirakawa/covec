@@ -12,6 +12,7 @@
 #include "covec/covec.hpp"
 
 using namespace covec;
+typedef float Real;
 
 inline bool match(const std::string& s, const std::string& longarg, const std::string& shortarg)
 { return std::string(s) == longarg || std::string(s) == shortarg; }
@@ -234,7 +235,7 @@ namespace{
   }
 
 
-  void save(const std::string& output_prefix, const Covec& cv, const std::vector<CodeBook>& codebooks)
+  void save(const std::string& output_prefix, const Covec<Real>& cv, const std::vector<CodeBook>& codebooks)
   {
     // // codebooks
     // for(std::size_t i=0; i<cv.order(); ++i){
@@ -323,7 +324,7 @@ int main(int narg, const char** argv)
 		     );
   }
   std::cout << "creating covec..." << std::endl;
-  Covec cv(probs, gen, dim, sigma, neg_size, eta0, eta1);
+  Covec<Real> cv(probs, gen, dim, sigma, neg_size, eta0, eta1);
 
   std::size_t count = 0, cum_count = 0, every_count = 10000;
   auto tick = std::chrono::system_clock::now();

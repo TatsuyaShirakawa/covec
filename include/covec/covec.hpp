@@ -13,6 +13,7 @@
 
 namespace covec{
 
+  template <class Real=double>
   struct Covec
   {
   public:
@@ -21,10 +22,10 @@ namespace covec{
     Covec(const std::vector<std::vector<std::size_t> >& each_counts,
 	  RandomGenerator& gen,
 	  const std::size_t dim = 128,
-	  const double sigma = 1.0e-1,
+	  const Real sigma = 1.0e-1,
 	  const std::size_t neg_size = 1,
-	  const double eta0 = 5e-3, // initial learning rate
-	  const double eta1 = 1e-5 // final learning rate
+	  const Real eta0 = 5e-3, // initial learning rate
+	  const Real eta1 = 1e-5 // final learning rate
 	  )
       : num_entries_(), dim_(), neg_size_(), eta0_(), eta1_()
       , vs_(), cs_()
@@ -42,10 +43,10 @@ namespace covec{
     Covec(const std::vector<std::pair<InputIterator, InputIterator> >& begs_and_ends,
 	  RandomGenerator& gen,
 	  const std::size_t dim = 128,
-	  const double sigma = 1.0e-1,
+	  const Real sigma = 1.0e-1,
 	  const std::size_t neg_size = 1,
-	  const double eta0 = 5e-3, // learning rate
-	  const double eta1 = 1e-5 // final learning rate
+	  const Real eta0 = 5e-3, // learning rate
+	  const Real eta1 = 1e-5 // final learning rate
 	  )
       : num_entries_(), dim_(), neg_size_(), eta0_(), eta1_()
       , vs_(), cs_()
@@ -64,10 +65,10 @@ namespace covec{
     Covec(const std::vector<std::shared_ptr<DiscreteDistribution> >& probs,
 	  RandomGenerator& gen,
 	  const std::size_t dim = 128,
-	  const double sigma = 1.0e-1,
+	  const Real sigma = 1.0e-1,
 	  const std::size_t neg_size = 1,
-	  const double eta0 = 5e-3, // learning rate
-	  const double eta1 = 1e-5 // final learning rate
+	  const Real eta0 = 5e-3, // learning rate
+	  const Real eta1 = 1e-5 // final learning rate
 	  )
       : num_entries_(), dim_(), neg_size_(), eta0_()
       , vs_(), cs_()
@@ -86,7 +87,7 @@ namespace covec{
     inline const std::vector<std::size_t>& num_entries() const
     { return this->num_entries_; }
 
-    inline const std::vector<std::vector<std::vector<double> > >& vectors() const
+    inline const std::vector<std::vector<std::vector<Real> > >& vectors() const
     { return this->vs_; }
 
     inline const std::size_t dimension() const
@@ -95,8 +96,11 @@ namespace covec{
     inline const std::size_t neg_size() const
     { return this->neg_size_; }
 
-    inline const double eta0() const
+    inline const Real eta0() const
     { return this->eta0_; }
+
+    inline const Real eta1() const
+    { return this->eta1_; }
 
   public:
 
@@ -104,10 +108,10 @@ namespace covec{
     void initialize(const std::vector<std::shared_ptr<DiscreteDistribution> >& probs,
 		    RandomGenerator& gen,
 		    const std::size_t dim = 128,
-		    const double sigma = 1.0e-1,
+		    const Real sigma = 1.0e-1,
 		    const std::size_t neg_size = 1,
-		    const double eta0 = 5e-3,
-		    const double eta1 = 1e-5
+		    const Real eta0 = 5e-3,
+		    const Real eta1 = 1e-5
 		    );
 
   private:
@@ -127,25 +131,26 @@ namespace covec{
     std::vector<std::size_t> num_entries_; // order -> # of entries
     std::size_t dim_;
     std::size_t neg_size_;
-    double eta0_;
-    double eta1_;
+    Real eta0_;
+    Real eta1_;
     std::vector<std::shared_ptr<DiscreteDistribution> > probs_;
-    std::vector<std::vector<std::vector<double> > > vs_; // order -> entry -> dim -> value
+    std::vector<std::vector<std::vector<Real> > > vs_; // order -> entry -> dim -> value
     std::vector<std::vector<std::size_t> > cs_; // counts of occurrencees
 
   }; // end of Covectorizer
 
   // -------------------------------------------------------------------------------
 
+  template <class Real>
   template <class RandomGenerator>
-  void Covec::initialize(const std::vector<std::shared_ptr<DiscreteDistribution> >& probs,
-			 RandomGenerator& gen,
-			 const std::size_t dim,
-			 const double sigma,
-			 const std::size_t neg_size,
-			 const double eta0,
-			 const double eta1
-			 )
+  void Covec<Real>::initialize(const std::vector<std::shared_ptr<DiscreteDistribution> >& probs,
+			       RandomGenerator& gen,
+			       const std::size_t dim,
+			       const Real sigma,
+			       const std::size_t neg_size,
+			       const Real eta0,
+			       const Real eta1
+			       )
   {
     this->probs_ = probs;
     this->dim_ = dim;
@@ -161,7 +166,7 @@ namespace covec{
     this->vs_.resize(order);
     this->cs_.resize(order);
 
-    std::normal_distribution<double> normal(0.0, sigma);
+    std::normal_distribution<Real> normal(0.0, sigma);
     for(std::size_t i = 0; i < order; ++i){
       const auto& prob = this->probs_[i];
       this->num_entries_.push_back(prob->probabilities().size());
@@ -169,7 +174,7 @@ namespace covec{
       auto& vs = this->vs_[i];
       vs.resize(num_entries);
       for(std::size_t j = 0; j < num_entries; ++j){
-	std::vector<double> v(this->dim_);
+	std::vector<Real> v(this->dim_);
 	for(std::size_t k = 0, K = this->dimension(); k < K; ++k){
 	  v[k] = normal(gen);
 	}
@@ -180,10 +185,11 @@ namespace covec{
     }
   }
 
+  template <class Real>
   template <class Grad>
-  void Covec::accumulate_grad(Grad& grads
-			      , const std::vector<std::size_t>& sample
-			      , Covec::POS_NEG pos_neg)
+  void Covec<Real>::accumulate_grad(Grad& grads
+				    , const std::vector<std::size_t>& sample
+				    , Covec::POS_NEG pos_neg)
   {
     assert( sample.size() == this->order() );
 
@@ -193,7 +199,7 @@ namespace covec{
 
     // count the occurences and
     // compute Hadamard product, inner_product, sigmoid of inner_product
-    std::vector<double> Hadamard_product(this->dimension(), 1.0);
+    std::vector<Real> Hadamard_product(this->dimension(), 1.0);
     for(std::size_t i = 0, I = this->order(); i < I; ++i){
       const auto j = sample[i];
       ++this->cs_[i][j];
@@ -203,9 +209,9 @@ namespace covec{
 	Hadamard_product[k] *= v[k];
       }
     }
-    double inner_product = std::accumulate(Hadamard_product.begin(), Hadamard_product.end(), 0.0);
-    double sigmoid = 1.0 / ( 1 + std::exp(-inner_product) );
-    double coeff = (pos_neg == POSITIVE? 1-sigmoid : -sigmoid);
+    Real inner_product = std::accumulate(Hadamard_product.begin(), Hadamard_product.end(), 0.0);
+    Real sigmoid = 1.0 / ( 1 + std::exp(-inner_product) );
+    Real coeff = (pos_neg == POSITIVE? 1-sigmoid : -sigmoid);
     // compute gradients
     for(std::size_t i = 0, I = this->order(); i < I; ++i){
       const auto& j = sample[i];
@@ -213,10 +219,10 @@ namespace covec{
       auto& grads_i = grads[i];
       auto itr = grads_i.find(j);
       if(itr == grads_i.end()){
-	auto ret = grads_i.insert(std::make_pair(j, std::vector<double>(this->dimension(), 0.0)));
+	auto ret = grads_i.insert(std::make_pair(j, std::vector<Real>(this->dimension(), 0.0)));
 	itr = ret.first;
       }
-      std::vector<double>& g = itr->second;
+      std::vector<Real>& g = itr->second;
       for(std::size_t k = 0, K = this->dimension(); k < K; ++k){
 	if( Hadamard_product[k] == 0 ){ continue; }
 	g[k] += coeff * Hadamard_product[k] / v[k];
@@ -224,10 +230,11 @@ namespace covec{
     }
   }
 
+  template <class Real>
   template <class Grad>
-  void Covec::accumulate_grad_2(Grad& grads
-				, const std::vector<std::size_t>& sample
-				, Covec::POS_NEG pos_neg)
+  void Covec<Real>::accumulate_grad_2(Grad& grads
+				      , const std::vector<std::size_t>& sample
+				      , Covec::POS_NEG pos_neg)
   {
     assert( sample.size() == 2 && this->order() == 2 );
 
@@ -235,10 +242,10 @@ namespace covec{
     // compute Hadamard product, inner_product, sigmoid of inner_product
     const auto& v0 = this->vs_[0][sample[0]];
     const auto& v1 = this->vs_[1][sample[1]];
-    const double inner_product =
+    const Real inner_product =
       std::inner_product(v0.begin(), v0.end(), v1.begin(), 0.0);
-    double sigmoid = 1.0 / ( 1 + std::exp(-inner_product) );
-    double coeff = (pos_neg == POSITIVE? 1-sigmoid : -sigmoid);
+    Real sigmoid = 1.0 / ( 1 + std::exp(-inner_product) );
+    Real coeff = (pos_neg == POSITIVE? 1-sigmoid : -sigmoid);
 
     for(std::size_t i = 0; i < 2; ++i){
       const std::size_t j = sample[i];
@@ -246,7 +253,7 @@ namespace covec{
       auto& grads_i = grads[i];
       auto itr = grads_i.find(j);
       if(itr == grads_i.end()){
-	auto ret = grads_i.insert(std::make_pair(j, std::vector<double>(this->dimension(), 0.0)));
+	auto ret = grads_i.insert(std::make_pair(j, std::vector<Real>(this->dimension(), 0.0)));
 	itr = ret.first;
       }
       auto& g = itr->second;
@@ -257,11 +264,11 @@ namespace covec{
     }
   }
 
-
+  template <class Real>
   template <class InputIterator, class RandomGenerator>
-  void Covec::update_batch(InputIterator beg, InputIterator end, RandomGenerator& gen)
+  void Covec<Real>::update_batch(InputIterator beg, InputIterator end, RandomGenerator& gen)
   {
-    std::vector<std::unordered_map<std::size_t, std::vector<double> > > grads(this->order());
+    std::vector<std::unordered_map<std::size_t, std::vector<Real> > > grads(this->order());
 
     // accumulate gradients from positive samples
     std::size_t pos_size = 0;
@@ -293,14 +300,11 @@ namespace covec{
 	const auto& grad_ij = elem.second;
 	auto& vs_ij = vs_i[j];
 	for(std::size_t k = 0, K = this->dimension(); k < K; ++k){
-	  const double grad_ijk = grad_ij[k];
+	  const Real grad_ijk = grad_ij[k];
 	  if(grad_ijk != 0){
-	    const double cs_ij = cs_i[j];
-	    double eta = (this->eta0_ > this->eta1_ * cs_ij ?
+	    const Real cs_ij = cs_i[j];
+	    Real eta = (this->eta0_ > this->eta1_ * cs_ij ?
 			  this->eta0_ / cs_ij : this->eta1_);
-	    // if( this->eta0_ > this->eta1_ * cs_ij ){
-	    // }
-	    // double eta = std::max(this->eta0_ / cs_i[j], this->eta1_);
 	    vs_ij[k] += eta * grad_ijk;
 	  }
 	}
