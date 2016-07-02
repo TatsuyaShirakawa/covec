@@ -53,11 +53,41 @@ namespace{
     inline const std::vector<std::size_t>& counts() const
     { return this->counts_; }
 
+    inline const std::size_t count_of(const std::size_t c) const
+    { return this->counts_[c]; }
+
     inline const std::size_t encode(const std::string& x) const
     { return this->entry2codes_.at(x); }
 
     inline const std::string decode(const std::size_t c) const
     { return this->code2entries_[c]; }
+
+    // reconstructin encodings by descending order of counts
+    void reindex()
+    {
+      std::vector<std::pair<std::size_t, std::size_t> > ind_and_counts(this->counts_.size());
+      std::vector<std::size_t> new_counts(this->counts_.size());
+      std::vector<std::string> new_code2entries(this->counts_.size());
+      std::unordered_map<std::string, std::size_t> new_entry2codes;
+
+      for(std::size_t i = 0, I = this->counts_.size(); i < I; ++i){
+	ind_and_counts[i] = std::make_pair(this->counts_[i], i );
+      }
+
+      std::sort(ind_and_counts.begin(), ind_and_counts.end()
+		, std::greater<std::pair<std::size_t, std::size_t> >());
+      for(std::size_t i = 0, I = ind_and_counts.size(); i < I; ++i){
+	std::size_t count = ind_and_counts[i].first,
+	  ind = ind_and_counts[i].second;
+	const std::string& entry = this->code2entries_[ind];
+	new_counts[i] = count;
+	new_code2entries[i] = entry;
+	new_entry2codes.insert(std::make_pair(entry, i));
+      }
+      this->counts_ = new_counts;
+      this->code2entries_ = new_code2entries;
+      this->entry2codes_ = new_entry2codes;
+    }
 
   private:
     std::vector<std::size_t> counts_;
@@ -82,6 +112,67 @@ namespace{
       return false;
     }
 
+#if 1
+    std::string line;
+    std::size_t n_data = 0;
+
+    // create codebooks
+    while(std::getline(fin, line)){
+      ++n_data;
+      std::size_t pos_from = 0, pos_to = 0;
+      std::vector<std::size_t> instance(order);
+      std::size_t i=0;
+      do{
+	pos_to = line.find_first_of(sep, pos_from);
+	std::size_t code = codebooks[i].entry(line.substr(pos_from, pos_to-pos_from));
+	instance[i] = code;
+	if(pos_to == std::string::npos){
+	  pos_from = std::string::npos;
+	}else{
+	  pos_from = pos_to + 1;
+	}
+	++i;
+	if(i > order){
+	  std::cerr << "too many entries in a line: " << line << std::endl;
+	  exit(1);
+	}
+      }while(pos_from != std::string::npos);
+      if(i < order){
+	if(i > order){
+	  std::cerr << "too few entries in a line: " << line << std::endl;
+	  exit(1);
+	}
+      }
+    }
+
+    // renew encodings so that they are sorted by descending order of frequency
+    for(std::size_t i = 0; i < order; ++i){
+      codebooks[i].reindex();
+    }
+
+    // create data
+    std::size_t data_idx = data.size();
+    data.resize(data.size() + n_data);
+    fin.clear(); fin.seekg(0, std::ios_base::beg);
+    while(std::getline(fin, line)){
+      std::size_t pos_from = 0, pos_to = 0;
+      std::vector<std::size_t> instance(order);
+      std::size_t i=0;
+      do{
+	pos_to = line.find_first_of(sep, pos_from);
+	std::size_t code = codebooks[i].encode(line.substr(pos_from, pos_to-pos_from));
+	instance[i] = code;
+	if(pos_to == std::string::npos){
+	  pos_from = std::string::npos;
+	}else{
+	  pos_from = pos_to + 1;
+	}
+	++i;
+      }while(pos_from != std::string::npos);
+      data[data_idx] = instance;
+      ++data_idx;
+    }
+#else
     std::string line;
     while(std::getline(fin, line)){
       std::size_t pos_from = 0, pos_to = 0;
@@ -110,7 +201,7 @@ namespace{
       }
       data.push_back(instance);
     }
-
+#endif
     return true;
   }
 
@@ -142,17 +233,17 @@ namespace{
     const std::string help_message =
       "usage: " + program_name + " -i input_file [ options ]\n"
       + "Options and arguments:\n"
-      "--dim, -d DIM=128                        : the dimension of vectors\n"
-      "--batch_size, -b BATCH_SIZE=32           : BATCH_SIZE: the (mini)batch size\n"
-      "--num_epochs, -n NUM_EPOCHS=1            : NUM_EPOCHS: the number of epochs\n"
-      "--neg_size, -N NEGSIZE=1                 : the size of negative sampling\n"
-      "--sigma, -s SIGMA=0.1                    : initialize each element of vector with Normal(0, SIGMA)\n"
-      "--eta0, -e ETA0=0.005                    : initial learning rate for SGD\n"
-      "--eta1, -E ETA1=0.005                    : final learning rate for SGD\n"
-      "--input_file, -i INPUT_FILE              : input file. supposed that each line is separated by SEP\n"
-      "--output_prefix, -o OUTPUT_PREFIX=\"vec\": output file prefix\n"
-      "--sep, -s SEP='\t'                       : separator of each line in INPUT_FILE\n"
-      "--help, -h                               : show this help message\n"
+      "--dim, -d DIM=128                       : the dimension of vectors\n"
+      "--batch_size, -b BATCH_SIZE=32          : BATCH_SIZE: the (mini)batch size\n"
+      "--num_epochs, -n NUM_EPOCHS=1           : NUM_EPOCHS: the number of epochs\n"
+      "--neg_size, -N NEGSIZE=1                : the size of negative sampling\n"
+      "--sigma, -s SIGMA=0.1                   : initialize each element of vector with Normal(0, SIGMA)\n"
+      "--eta0, -e ETA0=0.005                   : initial learning rate for SGD\n"
+      "--eta1, -E ETA1=0.005                   : final learning rate for SGD\n"
+      "--input_file, -i INPUT_FILE             : input file. supposed that each line is separated by SEP\n"
+      "--output_prefix, -o OUTPUT_PREFIX=\"vec\" : output file prefix\n"
+      "--sep, -S SEP='" "\t" "'                       : separator of each line in INPUT_FILE\n"
+      "--help, -h                              : show this help message\n"
       ;
     bool input_file_found = false;
     for(int i=1; i<narg; ++i){
@@ -186,11 +277,17 @@ namespace{
 	result.input_file = x;
       }else if( match(argv[i], "--sep", "-S") ){
 	std::string x = argv[++i];
-	if( x.length() != 1 ){
-	  std::cerr << "sep must be a character but given : " << x << std::endl;
-	  exit(1);
+	if(x == "\\t"){
+	  result.sep = '\t';
+	}else if(x == "\\s"){
+	  result.sep = ' ';
+	}else{
+	  if( x.length() != 1 ){
+	    std::cerr << "sep must be a character but given : " << x << std::endl;
+	    exit(1);
+	  }
+	  result.sep = x[0];
 	}
-	result.sep = x[0];
       }else if( match(argv[i], "--help", "-h") ){
 	std::cout << help_message << std::endl;
 	exit(0);

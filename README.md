@@ -30,19 +30,20 @@ In the above sample, each line indicates a cooccurrences of elements (eg. ("the"
 You can see the all options by putting help options "-h" to covec.
 
 ```bash
-usage: covec -i input_file [ options ]
+$ covec -h
+usage: ./covec -i input_file [ options ]
 Options and arguments:
---dim, -d DIM=128                        : the dimension of vectors
---batch_size, -b BATCH_SIZE=32           : BATCH_SIZE: the (mini)batch size
---num_epochs, -n NUM_EPOCHS=1            : NUM_EPOCHS: the number of epochs
---neg_size, -N NEGSIZE=1                 : the size of negative sampling
---sigma, -s SIGMA=0.1                    : initialize each element of vector with Normal(0, SIGMA)
---eta0, -e ETA0=0.005                    : initial learning rate for AdaGrad
---input_file, -i INPUT_FILE              : input file. supposed that each line is separated by SEP
---output_prefix, -o OUTPUT_PREFIX="covec": output file prefix
---sep, -s SEP=' '                        : separator of each line in INPUT_FILE
---help, -h                               : show this help message
+--dim, -d DIM=128                       : the dimension of vectors
+--batch_size, -b BATCH_SIZE=32          : BATCH_SIZE: the (mini)batch size
+--num_epochs, -n NUM_EPOCHS=1           : NUM_EPOCHS: the number of epochs
+--neg_size, -N NEGSIZE=1                : the size of negative sampling
+--sigma, -s SIGMA=0.1                   : initialize each element of vector with Normal(0, SIGMA)
+--eta0, -e ETA0=0.005                   : initial learning rate for SGD
+--eta1, -E ETA1=0.005                   : final learning rate for SGD
+--input_file, -i INPUT_FILE             : input file. supposed that each line is separated by SEP
+--output_prefix, -o OUTPUT_PREFIX="vec" : output file prefix
+--sep, -S SEP='	'                       : separator of each line in INPUT_FILE
+--help, -h                              : show this help message
 
 ```
-
 
