@@ -25,7 +25,7 @@ namespace covec{
 	  const Real sigma = 1.0e-1,
 	  const std::size_t neg_size = 1,
 	  const Real eta0 = 5e-3, // initial learning rate
-	  const Real eta1 = 1e-5 // final learning rate
+	  const Real eta1 = 1e-5  // final learning rate
 	  )
       : num_entries_(), dim_(), neg_size_(), eta0_(), eta1_()
       , vs_(), cs_()
@@ -211,7 +211,7 @@ namespace covec{
     }
     Real inner_product = std::accumulate(Hadamard_product.begin(), Hadamard_product.end(), 0.0);
     Real sigmoid = 1.0 / ( 1 + std::exp(-inner_product) );
-    Real coeff = (pos_neg == POSITIVE? 1-sigmoid : -sigmoid);
+    Real coeff = (pos_neg == POSITIVE ? 1 - sigmoid : -sigmoid);
     // compute gradients
     for(std::size_t i = 0, I = this->order(); i < I; ++i){
       const auto& j = sample[i];
@@ -245,7 +245,7 @@ namespace covec{
     const Real inner_product =
       std::inner_product(v0.begin(), v0.end(), v1.begin(), 0.0);
     Real sigmoid = 1.0 / ( 1 + std::exp(-inner_product) );
-    Real coeff = (pos_neg == POSITIVE? 1-sigmoid : -sigmoid);
+    Real coeff = (pos_neg == POSITIVE ? 1 - sigmoid : -sigmoid);
 
     for(std::size_t i = 0; i < 2; ++i){
       const std::size_t j = sample[i];
@@ -299,14 +299,12 @@ namespace covec{
 	const auto j = elem.first;
 	const auto& grad_ij = elem.second;
 	auto& vs_ij = vs_i[j];
+	const Real cs_ij = cs_i[j];
+	const Real eta = (this->eta0_ > this->eta1_ * cs_ij ?
+			  this->eta0_ / cs_ij : this->eta1_);
 	for(std::size_t k = 0, K = this->dimension(); k < K; ++k){
 	  const Real grad_ijk = grad_ij[k];
-	  if(grad_ijk != 0){
-	    const Real cs_ij = cs_i[j];
-	    Real eta = (this->eta0_ > this->eta1_ * cs_ij ?
-			  this->eta0_ / cs_ij : this->eta1_);
-	    vs_ij[k] += eta * grad_ijk;
-	  }
+	  vs_ij[k] += eta * grad_ijk;
 	}
       }
 
