@@ -119,12 +119,14 @@ namespace covec{
     typedef enum { POSITIVE, NEGATIVE } POS_NEG;
 
     template <class Grad>
-    void accumulate_grad(Grad& grads, const std::vector<std::size_t>& sample
+    void accumulate_grad(Grad& grads, std::size_t& data_count
+			 , const std::vector<std::size_t>& sample
 			 , const POS_NEG pos_neg);
 
     // in case order == 2
     template <class Grad>
-    void accumulate_grad_2(Grad& grads, const std::vector<std::size_t>& sample
+    void accumulate_grad_2(Grad& grads, std::size_t& data_count
+			   , const std::vector<std::size_t>& sample
 			   , const POS_NEG pos_neg);
 
   private:
@@ -188,13 +190,14 @@ namespace covec{
   template <class Real>
   template <class Grad>
   void Covec<Real>::accumulate_grad(Grad& grads
+				    , std::size_t& data_count
 				    , const std::vector<std::size_t>& sample
 				    , Covec::POS_NEG pos_neg)
   {
     assert( sample.size() == this->order() );
 
     if( this->order() == 2 ){
-      return accumulate_grad_2(grads, sample, pos_neg);
+      return accumulate_grad_2(grads, data_count, sample, pos_neg);
     }
 
     // count the occurences and
@@ -212,27 +215,30 @@ namespace covec{
     Real inner_product = std::accumulate(Hadamard_product.begin(), Hadamard_product.end(), 0.0);
     Real sigmoid = 1.0 / ( 1 + std::exp(-inner_product) );
     Real coeff = (pos_neg == POSITIVE ? 1 - sigmoid : -sigmoid);
+
     // compute gradients
     for(std::size_t i = 0, I = this->order(); i < I; ++i){
       const auto& j = sample[i];
       const auto& v = this->vs_[i][j];
       auto& grads_i = grads[i];
-      auto itr = grads_i.find(j);
-      if(itr == grads_i.end()){
-	auto ret = grads_i.insert(std::make_pair(j, std::vector<Real>(this->dimension(), 0.0)));
-	itr = ret.first;
+      if( grads_i.size() <= data_count ){
+	grads_i.push_back(std::make_pair(j, std::vector<Real>(this->dimension(), 0.0)));
       }
-      std::vector<Real>& g = itr->second;
+      grads_i[data_count].first = j;
+      auto& g = grads_i[data_count].second;
       for(std::size_t k = 0, K = this->dimension(); k < K; ++k){
 	if( Hadamard_product[k] == 0 ){ continue; }
-	g[k] += coeff * Hadamard_product[k] / v[k];
+	g[k] = coeff * Hadamard_product[k] / v[k];
       }
     }
+
+    ++data_count;
   }
 
   template <class Real>
   template <class Grad>
   void Covec<Real>::accumulate_grad_2(Grad& grads
+				      , std::size_t& data_count
 				      , const std::vector<std::size_t>& sample
 				      , Covec::POS_NEG pos_neg)
   {
@@ -251,42 +257,45 @@ namespace covec{
       const std::size_t j = sample[i];
       ++this->cs_[i][j];
       auto& grads_i = grads[i];
-      auto itr = grads_i.find(j);
-      if(itr == grads_i.end()){
-	auto ret = grads_i.insert(std::make_pair(j, std::vector<Real>(this->dimension(), 0.0)));
-	itr = ret.first;
+      if( grads_i.size() <= data_count ){
+	grads_i.push_back(std::make_pair(j, std::vector<Real>(this->dimension(), 0.0)));
       }
-      auto& g = itr->second;
+      grads_i[data_count].first = j;
+      auto& g = grads_i[data_count].second;
       const auto& v = (i == 0 ? v1 : v0);
       for(std::size_t k = 0, K = this->dimension(); k < K; ++k){
-	g[k] += coeff * v[k];
+	g[k] = coeff * v[k];
       }
     }
+
+    ++data_count;
   }
 
   template <class Real>
   template <class InputIterator, class RandomGenerator>
   void Covec<Real>::update_batch(InputIterator beg, InputIterator end, RandomGenerator& gen)
   {
-    std::vector<std::unordered_map<std::size_t, std::vector<Real> > > grads(this->order());
+    typedef std::pair<std::size_t, std::vector<Real> > j_grad;
+    static std::vector< std::vector< j_grad > > grads(this->order()); // order -> data_idx -> entry -> dim -> value
+    std::size_t data_count = 0;
 
     // accumulate gradients from positive samples
     std::size_t pos_size = 0;
     for(auto itr = beg; itr != end; ++itr){
       ++pos_size;
-      accumulate_grad(grads, *itr, POSITIVE);
+      accumulate_grad(grads, data_count, *itr, POSITIVE);
     }
 
     // generate negative_sample
     // and accumulate its gradient
-    std::vector<std::size_t> negative(this->order());
     for(std::size_t m = 0, M = pos_size * this->neg_size(); m < M; ++m){
+      std::vector<std::size_t> negative_sample(this->order());
       for(std::size_t i = 0, I = this->order(); i < I; ++i){
 	std::size_t j = this->probs_[i]->operator()(gen);
-	negative[i] = j;
+	negative_sample[i] = j;
 	++this->cs_[i][j];
       }
-      accumulate_grad(grads, negative, NEGATIVE);
+      accumulate_grad(grads, data_count, negative_sample, NEGATIVE);
     }
 
     // update
@@ -295,13 +304,14 @@ namespace covec{
       const auto& cs_i = this->cs_[i];
       const auto& grad_i = grads[i];
       // update sqgs, vs
-      for(const auto& elem : grad_i){
+      for(std::size_t data_idx = 0; data_idx < data_count; ++data_idx){
+	const auto& elem = grad_i[data_idx];
 	const auto j = elem.first;
 	const auto& grad_ij = elem.second;
 	auto& vs_ij = vs_i[j];
 	const Real cs_ij = cs_i[j];
-	const Real eta = (this->eta0_ > this->eta1_ * cs_ij ?
-			  this->eta0_ / cs_ij : this->eta1_);
+	Real eta = this->eta0_ / cs_ij;
+	if(eta < this->eta1_){ eta = this->eta1_; }
 	for(std::size_t k = 0, K = this->dimension(); k < K; ++k){
 	  const Real grad_ijk = grad_ij[k];
 	  vs_ij[k] += eta * grad_ijk;
