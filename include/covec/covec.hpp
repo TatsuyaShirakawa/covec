@@ -192,7 +192,7 @@ namespace covec{
   void Covec<Real>::accumulate_grad(Grad& grads
 				    , std::size_t& data_count
 				    , const std::vector<std::size_t>& sample
-				    , Covec::POS_NEG pos_neg)
+				    , typename Covec::POS_NEG pos_neg)
   {
     assert( sample.size() == this->order() );
 
@@ -240,7 +240,7 @@ namespace covec{
   void Covec<Real>::accumulate_grad_2(Grad& grads
 				      , std::size_t& data_count
 				      , const std::vector<std::size_t>& sample
-				      , Covec::POS_NEG pos_neg)
+				      , typename Covec::POS_NEG pos_neg)
   {
     assert( sample.size() == 2 && this->order() == 2 );
 

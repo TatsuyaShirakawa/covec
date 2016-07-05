@@ -3,9 +3,10 @@
 #include <sstream>
 #include <iostream>
 #include <algorithm>
+#include <iomanip>
+#include <functional>
 #include <memory>
 #include <random>
-#include <iomanip>
 #include <unordered_map>
 #include <chrono>
 
@@ -234,8 +235,8 @@ namespace{
       "usage: " + program_name + " -i input_file [ options ]\n"
       + "Options and arguments:\n"
       "--dim, -d DIM=128                       : the dimension of vectors\n"
-      "--batch_size, -b BATCH_SIZE=32          : BATCH_SIZE: the (mini)batch size\n"
-      "--num_epochs, -n NUM_EPOCHS=1           : NUM_EPOCHS: the number of epochs\n"
+      "--batch_size, -b BATCH_SIZE=32          : the (mini)batch size\n"
+      "--num_epochs, -n NUM_EPOCHS=1           : the number of epochs\n"
       "--neg_size, -N NEGSIZE=1                : the size of negative sampling\n"
       "--sigma, -s SIGMA=0.1                   : initialize each element of vector with Normal(0, SIGMA)\n"
       "--eta0, -e ETA0=0.005                   : initial learning rate for SGD\n"
