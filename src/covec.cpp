@@ -335,23 +335,9 @@ namespace{
 
   void save(const std::string& output_prefix, const Covec<Real>& cv, const std::vector<CodeBook>& codebooks)
   {
-    // // codebooks
-    // for(std::size_t i=0; i<cv.order(); ++i){
-    //   const std::string output_file = output_prefix + "." + std::to_string(i) + ".codebook.tsv";
-    //   std::ofstream fout(output_file);
-    //   if(!fout || !fout.good()){
-    // 	std::cerr << "cannot open output_codebook_file: " << output_file << std::endl;
-    // 	exit(1);
-    //   }
-
-    //   for(std::size_t j=0; j<codebooks[i].size(); ++j){
-    // 	fout << j << "\t" << codebooks[i].decode(j) << "\n";
-    //   }
-    // }
-
     // vectors
     const auto& vs = cv.vectors();
-    for(std::size_t i=0; i<cv.order(); ++i){
+    for(std::size_t i = 0, I = cv.order(); i < I; ++i){
       const std::string output_file = output_prefix + "." + std::to_string(i) + ".tsv";
       std::ofstream fout(output_file);
       if(!fout || !fout.good()){
@@ -359,10 +345,13 @@ namespace{
 	exit(1);
       }
 
-      for(std::size_t j=0; j<vs[i].size(); ++j){
-	fout << codebooks[i].decode(j);
-	for(std::size_t k=0; k<cv.dimension(); ++k){
-	  fout << "\t" << vs[i][j][k];
+      const auto& vs_i = vs[i];
+      const auto& codebooks_i = codebooks[i];
+      for(std::size_t j = 0, J = vs_i.size(); j < J; ++j){
+	const auto& vs_ij = vs_i[j];
+	fout << codebooks_i.decode(j);
+	for(std::size_t k = 0, K = vs_ij.size(); k < K; ++k){
+	  fout << "\t" << vs_ij[k];
 	}
 	fout << "\n";
       }

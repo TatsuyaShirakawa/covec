@@ -102,7 +102,7 @@ namespace covec{
     inline const Real eta1() const
     { return this->eta1_; }
 
-  public:
+  private:
 
     template <class RandomGenerator>
     void initialize(const std::vector<std::shared_ptr<DiscreteDistribution> >& probs,
@@ -113,8 +113,6 @@ namespace covec{
 		    const Real eta0 = 5e-3,
 		    const Real eta1 = 1e-5
 		    );
-
-  private:
 
     typedef enum { POSITIVE, NEGATIVE } POS_NEG;
 
@@ -192,7 +190,7 @@ namespace covec{
   void Covec<Real>::accumulate_grad(Grad& grads
 				    , std::size_t& data_count
 				    , const std::vector<std::size_t>& sample
-				    , typename Covec::POS_NEG pos_neg)
+				    , const typename Covec::POS_NEG pos_neg)
   {
     assert( sample.size() == this->order() );
 
@@ -202,7 +200,7 @@ namespace covec{
 
     // count the occurences and
     // compute Hadamard product, inner_product, sigmoid of inner_product
-    std::vector<Real> Hadamard_product(this->dimension(), 1.0);
+    static std::vector<Real> Hadamard_product(this->dimension(), 1.0);
     for(std::size_t i = 0, I = this->order(); i < I; ++i){
       const auto j = sample[i];
       ++this->cs_[i][j];
@@ -240,7 +238,7 @@ namespace covec{
   void Covec<Real>::accumulate_grad_2(Grad& grads
 				      , std::size_t& data_count
 				      , const std::vector<std::size_t>& sample
-				      , typename Covec::POS_NEG pos_neg)
+				      , const typename Covec::POS_NEG pos_neg)
   {
     assert( sample.size() == 2 && this->order() == 2 );
 
@@ -288,8 +286,8 @@ namespace covec{
 
     // generate negative_sample
     // and accumulate its gradient
+    static std::vector<std::size_t> negative_sample(this->order());
     for(std::size_t m = 0, M = pos_size * this->neg_size(); m < M; ++m){
-      std::vector<std::size_t> negative_sample(this->order());
       for(std::size_t i = 0, I = this->order(); i < I; ++i){
 	std::size_t j = this->probs_[i]->operator()(gen);
 	negative_sample[i] = j;
@@ -317,9 +315,7 @@ namespace covec{
 	  vs_ij[k] += eta * grad_ijk;
 	}
       }
-
     }
-
 
   } // end of update_batch
 
