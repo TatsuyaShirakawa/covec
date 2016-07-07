@@ -35,7 +35,6 @@ namespace covec{
 	auto prob = std::make_shared<DiscreteDistribution>(counts.begin(), counts.end());
 	probs.push_back(prob);
       }
-
       this->initialize(probs, gen, dim, sigma, neg_size, eta0, eta1);
     }
 
@@ -57,7 +56,6 @@ namespace covec{
 	auto prob = std::make_shared<DiscreteDistribution>(beg, end);
 	probs.push_back(prob);
       }
-
       this->initialize(probs, gen, dim, sigma, neg_size, eta0, eta1);
     }
 
@@ -277,23 +275,19 @@ namespace covec{
     static std::vector< std::vector< j_grad > > grads(this->order()); // order -> data_idx -> entry -> dim -> value
     std::size_t data_count = 0;
 
-    // accumulate gradients from positive samples
-    std::size_t pos_size = 0;
-    for(auto itr = beg; itr != end; ++itr){
-      ++pos_size;
-      accumulate_grad(grads, data_count, *itr, POSITIVE);
-    }
-
-    // generate negative_sample
-    // and accumulate its gradient
+    // accumulate gradients
     static std::vector<std::size_t> negative_sample(this->order());
-    for(std::size_t m = 0, M = pos_size * this->neg_size(); m < M; ++m){
-      for(std::size_t i = 0, I = this->order(); i < I; ++i){
-	std::size_t j = this->probs_[i]->operator()(gen);
-	negative_sample[i] = j;
-	++this->cs_[i][j];
+    for(auto itr = beg; itr != end; ++itr){
+      // gradient from positive sample
+      accumulate_grad(grads, data_count, *itr, POSITIVE);
+      // gradient(s) from negative sample      
+      for(std::size_t m = 0, M = this->neg_size(); m < M; ++m){
+	for(std::size_t i = 0, I = this->order(); i < I; ++i){
+	  std::size_t j = this->probs_[i]->operator()(gen);
+	  negative_sample[i] = j;
+	}
+	accumulate_grad(grads, data_count, negative_sample, NEGATIVE);
       }
-      accumulate_grad(grads, data_count, negative_sample, NEGATIVE);
     }
 
     // update
@@ -307,12 +301,10 @@ namespace covec{
 	const auto j = elem.first;
 	const auto& grad_ij = elem.second;
 	auto& vs_ij = vs_i[j];
-	const Real cs_ij = cs_i[j];
-	Real eta = this->eta0_ / cs_ij;
+	Real eta = this->eta0_ / cs_i[j];
 	if(eta < this->eta1_){ eta = this->eta1_; }
 	for(std::size_t k = 0, K = this->dimension(); k < K; ++k){
-	  const Real grad_ijk = grad_ij[k];
-	  vs_ij[k] += eta * grad_ijk;
+	  vs_ij[k] += eta * grad_ij[k];
 	}
       }
     }
