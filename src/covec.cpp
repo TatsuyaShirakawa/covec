@@ -18,6 +18,9 @@ typedef float Real;
 inline bool match(const std::string& s, const std::string& longarg, const std::string& shortarg)
 { return std::string(s) == longarg || std::string(s) == shortarg; }
 
+inline bool match(const std::string& s, const std::string& arg)
+{ return std::string(s) == arg; }
+
 
 #define REQUIRED_POSITIVE(x, name)					\
   if(x <= 0){								\
@@ -101,7 +104,8 @@ namespace{
 	    std::vector<std::vector<std::size_t> >& data,
 	    const std::string& input_file,
 	    const std::size_t order,
-	    const char sep
+	    const char sep,
+	    bool sort_enabled
 	    )
   {
     codebooks.clear();
@@ -113,11 +117,8 @@ namespace{
       return false;
     }
 
-#if 1
     std::string line;
     std::size_t n_data = 0;
-
-    // create codebooks
     while(std::getline(fin, line)){
       ++n_data;
       std::size_t pos_from = 0, pos_to = 0;
@@ -144,65 +145,40 @@ namespace{
 	  exit(1);
 	}
       }
+      if(!sort_enabled){ data.push_back(instance); }
     }
 
-    // renew encodings so that they are sorted by descending order of frequency
-    for(std::size_t i = 0; i < order; ++i){
-      codebooks[i].reindex();
-    }
-
-    // create data
-    std::size_t data_idx = data.size();
-    data.resize(data.size() + n_data);
-    fin.clear(); fin.seekg(0, std::ios_base::beg);
-    while(std::getline(fin, line)){
-      std::size_t pos_from = 0, pos_to = 0;
-      std::vector<std::size_t> instance(order);
-      std::size_t i=0;
-      do{
-	pos_to = line.find_first_of(sep, pos_from);
-	std::size_t code = codebooks[i].encode(line.substr(pos_from, pos_to-pos_from));
-	instance[i] = code;
-	if(pos_to == std::string::npos){
-	  pos_from = std::string::npos;
-	}else{
-	  pos_from = pos_to + 1;
-	}
-	++i;
-      }while(pos_from != std::string::npos);
-      data[data_idx] = instance;
-      ++data_idx;
-    }
-#else
-    std::string line;
-    while(std::getline(fin, line)){
-      std::size_t pos_from = 0, pos_to = 0;
-      std::vector<std::size_t> instance(order);
-      std::size_t i=0;
-      do{
-	pos_to = line.find_first_of(sep, pos_from);
-	std::size_t code = codebooks[i].entry(line.substr(pos_from, pos_to-pos_from));
-	instance[i] = code;
-	if(pos_to == std::string::npos){
-	  pos_from = std::string::npos;
-	}else{
-	  pos_from = pos_to + 1;
-	}
-	++i;
-	if(i > order){
-	  std::cerr << "too many entries in a line: " << line << std::endl;
-	  exit(1);
-	}
-      }while(pos_from != std::string::npos);
-      if(i < order){
-	if(i > order){
-	  std::cerr << "too few entries in a line: " << line << std::endl;
-	  exit(1);
-	}
+    if(sort_enabled){
+      // renew encodings so that they are sorted by descending order of frequency
+      for(std::size_t i = 0; i < order; ++i){
+	codebooks[i].reindex();
       }
-      data.push_back(instance);
-    }
-#endif
+
+      // create data
+      std::size_t data_idx = data.size();
+      data.resize(data.size() + n_data);
+      fin.clear(); fin.seekg(0, std::ios_base::beg);
+      while(std::getline(fin, line)){
+	std::size_t pos_from = 0, pos_to = 0;
+	std::vector<std::size_t> instance(order);
+	std::size_t i=0;
+	do{
+	  pos_to = line.find_first_of(sep, pos_from);
+	  std::size_t code = codebooks[i].encode(line.substr(pos_from, pos_to-pos_from));
+	  instance[i] = code;
+	  if(pos_to == std::string::npos){
+	    pos_from = std::string::npos;
+	  }else{
+	    pos_from = pos_to + 1;
+	  }
+	  ++i;
+	}while(pos_from != std::string::npos);
+	data[data_idx] = instance;
+	++data_idx;
+      }
+    }      
+
+    
     return true;
   }
 
@@ -212,6 +188,7 @@ namespace{
       : order(2), dim(128), batch_size(32), num_epochs(1)
       , neg_size(1), sigma(1.0e-1), eta0(5e-3), eta1(1e-5)
       , input_file(), output_prefix("result"), sep('\t')
+      , shuffle_enabled(false), sort_enabled(false)
     {}
 
     std::size_t order;
@@ -225,6 +202,8 @@ namespace{
     std::string input_file;
     std::string output_prefix;
     char sep;
+    bool shuffle_enabled;
+    bool sort_enabled;
   }; // end of Config
 
   Config parse_args(int narg, const char** argv)
@@ -245,6 +224,8 @@ namespace{
       "--output_prefix, -o OUTPUT_PREFIX=\"vec\" : output file prefix\n"
       "--sep, -S SEP='" "\t" "'                       : separator of each line in INPUT_FILE\n"
       "--help, -h                              : show this help message\n"
+      "--shuffle                               : enuable the switch to shuffle data before every epoch\n"
+      "--sort                                  : sort entries by descending order of frequency"
       ;
     bool input_file_found = false;
     for(int i=1; i<narg; ++i){
@@ -289,6 +270,10 @@ namespace{
 	  }
 	  result.sep = x[0];
 	}
+      }else if( match(argv[i], "--shuffle") ){
+	result.shuffle_enabled = true;
+      }else if( match(argv[i], "--sort") ){
+	result.sort_enabled = true;
       }else if( match(argv[i], "--help", "-h") ){
 	std::cout << help_message << std::endl;
 	exit(0);
@@ -377,6 +362,8 @@ int main(int narg, const char** argv)
   const std::string output_prefix = config.output_prefix;
   const char sep = config.sep;
   const std::size_t order = detect_order(input_file, sep);
+  const bool shuffle_enabled = config.shuffle_enabled;
+  const bool sort_enabled = config.sort_enabled;
 
   std::cout << "config:" << std::endl;
   std::cout << "  " << "dim          : " << dim << std::endl;
@@ -395,7 +382,7 @@ int main(int narg, const char** argv)
   std::vector<std::vector<std::size_t> > data;
   std::mt19937 gen(0);
   std::cout << "loading " << input_file << "..." << std::endl;;
-  load(codebooks, data, input_file, order, sep);
+  load(codebooks, data, input_file, order, sep, sort_enabled);
 
   std::cout << "data size: " << data.size() << std::endl;
   std::cout << "codebook sizes:" << std::endl;
@@ -416,7 +403,7 @@ int main(int narg, const char** argv)
   auto tick = std::chrono::system_clock::now();
   for(std::size_t epoch=0; epoch<num_epochs; ++epoch){
     std::srand(gen());
-    std::random_shuffle(data.begin(), data.end());
+    if(shuffle_enabled){ std::random_shuffle(data.begin(), data.end()); }
     for(std::size_t m=0; m < data.size(); m += batch_size){
 
       if(count >= every_count){ // reporting
