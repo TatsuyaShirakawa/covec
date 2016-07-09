@@ -391,15 +391,15 @@ int main(int narg, const char** argv)
   }
 
   std::cout << "creating distributions..." << std::endl;
-  std::vector<std::shared_ptr<DiscreteDistribution> > probs;
+  std::vector<std::shared_ptr<std::discrete_distribution<double> > > probs;
   for(std::size_t i=0; i < codebooks.size(); ++i){
-    probs.push_back( std::make_shared<DiscreteDistribution>
+    probs.push_back( std::make_shared<std::discrete_distribution<double> >
 		     (codebooks[i].counts().begin(), codebooks[i].counts().end())
 		     );
   }
   std::cout << "creating covec..." << std::endl;
   Covec<Real> cv(probs, gen, dim, sigma, neg_size, eta0, eta1);
-  std::size_t count = 0, cum_count = 0, every_count = 10000;
+  std::size_t count = 0, cum_count = 0, every_count = 100000;
   auto tick = std::chrono::system_clock::now();
   for(std::size_t epoch=0; epoch<num_epochs; ++epoch){
     std::srand(gen());

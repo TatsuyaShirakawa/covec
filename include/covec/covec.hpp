@@ -9,8 +9,6 @@
 #include <random>
 #include <unordered_map>
 
-#include "covec/discrete_distribution.hpp"
-
 namespace covec{
 
   template <class Real=double>
@@ -30,9 +28,9 @@ namespace covec{
       : num_entries_(), dim_(), neg_size_(), eta0_(), eta1_()
       , vs_(), cs_()
     {
-      std::vector<std::shared_ptr<DiscreteDistribution> > probs;
+      std::vector<std::shared_ptr<std::discrete_distribution<double> > > probs;
       for(const auto& counts : each_counts){
-	auto prob = std::make_shared<DiscreteDistribution>(counts.begin(), counts.end());
+	auto prob = std::make_shared<std::discrete_distribution<double> >(counts.begin(), counts.end());
 	probs.push_back(prob);
       }
       this->initialize(probs, gen, dim, sigma, neg_size, eta0, eta1);
@@ -50,17 +48,17 @@ namespace covec{
       : num_entries_(), dim_(), neg_size_(), eta0_(), eta1_()
       , vs_(), cs_()
     {
-      std::vector<std::shared_ptr<DiscreteDistribution> > probs;
+      std::vector<std::shared_ptr<std::discrete_distribution<double> > > probs;
       for(const auto&& beg_and_end : begs_and_ends){
 	InputIterator beg=beg_and_end.first, end=beg_and_end.second;
-	auto prob = std::make_shared<DiscreteDistribution>(beg, end);
+	auto prob = std::make_shared<std::discrete_distribution<double> >(beg, end);
 	probs.push_back(prob);
       }
       this->initialize(probs, gen, dim, sigma, neg_size, eta0, eta1);
     }
 
     template <class RandomGenerator>
-    Covec(const std::vector<std::shared_ptr<DiscreteDistribution> >& probs,
+    Covec(const std::vector<std::shared_ptr<std::discrete_distribution<double> > >& probs,
 	  RandomGenerator& gen,
 	  const std::size_t dim = 128,
 	  const Real sigma = 1.0e-1,
@@ -103,7 +101,7 @@ namespace covec{
   private:
 
     template <class RandomGenerator>
-    void initialize(const std::vector<std::shared_ptr<DiscreteDistribution> >& probs,
+    void initialize(const std::vector<std::shared_ptr<std::discrete_distribution<double> > >& probs,
 		    RandomGenerator& gen,
 		    const std::size_t dim = 128,
 		    const Real sigma = 1.0e-1,
@@ -131,7 +129,7 @@ namespace covec{
     std::size_t neg_size_;
     Real eta0_;
     Real eta1_;
-    std::vector<std::shared_ptr<DiscreteDistribution> > probs_;
+    std::vector<std::shared_ptr<std::discrete_distribution<double> > > probs_;
     std::vector<std::vector<std::vector<Real> > > vs_; // order -> entry -> dim -> value
     std::vector<std::vector<std::size_t> > cs_; // counts of occurrencees
 
@@ -141,7 +139,7 @@ namespace covec{
 
   template <class Real>
   template <class RandomGenerator>
-  void Covec<Real>::initialize(const std::vector<std::shared_ptr<DiscreteDistribution> >& probs,
+  void Covec<Real>::initialize(const std::vector<std::shared_ptr<std::discrete_distribution<double> > >& probs,
 			       RandomGenerator& gen,
 			       const std::size_t dim,
 			       const Real sigma,
