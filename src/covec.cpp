@@ -185,8 +185,9 @@ namespace{
   struct Config
   {
     Config()
-      : order(2), dim(128), batch_size(32), num_epochs(1)
-      , neg_size(1), sigma(1.0e-1), eta0(5e-3), eta1(1e-5)
+      : order(2), dim(128), batch_size(512), num_epochs(1)
+      , neg_size(1), num_threads(8)
+      , sigma(1.0e-1), eta0(5e-3), eta1(1e-5)
       , input_file(), output_prefix("result"), sep('\t')
       , shuffle_enabled(false), sort_enabled(false)
     {}
@@ -196,6 +197,7 @@ namespace{
     std::size_t batch_size;
     std::size_t num_epochs;
     std::size_t neg_size;
+    std::size_t num_threads;
     double sigma;
     double eta0;
     double eta1;
@@ -214,9 +216,10 @@ namespace{
       "usage: " + program_name + " -i input_file [ options ]\n"
       + "Options and arguments:\n"
       "--dim, -d DIM=128                       : the dimension of vectors\n"
-      "--batch_size, -b BATCH_SIZE=32          : the (mini)batch size\n"
+      "--batch_size, -b BATCH_SIZE=512         : the (mini)batch size\n"
       "--num_epochs, -n NUM_EPOCHS=1           : the number of epochs\n"
       "--neg_size, -N NEGSIZE=1                : the size of negative sampling\n"
+      "--num_threads, -T NUM_THREADS=8         : the number of threads\n"
       "--sigma, -s SIGMA=0.1                   : initialize each element of vector with Normal(0, SIGMA)\n"
       "--eta0, -e ETA0=0.005                   : initial learning rate for SGD\n"
       "--eta1, -E ETA1=0.005                   : final learning rate for SGD\n"
@@ -245,6 +248,10 @@ namespace{
 	int x = std::stoi(argv[++i]);
 	REQUIRED_POSITIVE(x, "neg_size");
 	result.neg_size = static_cast<std::size_t>(x);
+      }else if( match(argv[i], "--num_threads", "-T") ){
+	int x = std::stoi(argv[++i]);
+	REQUIRED_POSITIVE(x, "num_threads");
+	result.num_threads = static_cast<std::size_t>(x);
       }else if( match(argv[i], "--sigma", "-s") ){
 	double x = std::stod(argv[++i]);
 	REQUIRED_POSITIVE(x, "sigma");
@@ -355,6 +362,7 @@ int main(int narg, const char** argv)
   const std::size_t batch_size = config.batch_size;
   const std::size_t num_epochs = config.num_epochs;
   const std::size_t neg_size = config.neg_size;
+  const std::size_t num_threads = config.num_threads;
   const double sigma = config.sigma;
   const double eta0 = config.eta0;
   const double eta1 = config.eta1;
@@ -370,6 +378,7 @@ int main(int narg, const char** argv)
   std::cout << "  " <<  "batch_size   : " << batch_size << std::endl;
   std::cout << "  " <<  "num_epochs   : " << num_epochs << std::endl;
   std::cout << "  " <<  "neg_size     : " << neg_size << std::endl;
+  std::cout << "  " <<  "num_threads  : " << num_threads << std::endl;  
   std::cout << "  " <<  "sigma        : " << sigma << std::endl;
   std::cout << "  " <<  "eta0         : " << eta0 << std::endl;
   std::cout << "  " <<  "eta1         : " << eta1 << std::endl;
@@ -399,12 +408,12 @@ int main(int narg, const char** argv)
   }
   std::cout << "creating covec..." << std::endl;
   Covec<Real> cv(probs, gen, dim, sigma, neg_size, eta0, eta1);
-  std::size_t count = 0, cum_count = 0, every_count = 100000;
+  std::size_t count = 0, cum_count = 0, every_count = 300000;
   auto tick = std::chrono::system_clock::now();
   for(std::size_t epoch=0; epoch<num_epochs; ++epoch){
     std::srand(gen());
     if(shuffle_enabled){ std::random_shuffle(data.begin(), data.end()); }
-    for(std::size_t m=0; m < data.size(); m += batch_size){
+    for(std::size_t m=0; m < data.size();){
 
       if(count >= every_count){ // reporting
 	auto tack = std::chrono::system_clock::now();
@@ -420,10 +429,11 @@ int main(int narg, const char** argv)
 	count = 0;
 	tick = std::chrono::system_clock::now();
       }
-      const std::size_t M = std::min(m + batch_size, data.size());
-      cv.update_batch(data.begin() + m, data.begin() + M, gen);
+      const std::size_t M = std::min(m + batch_size * num_threads, data.size());
+      cv.update_batch(data.begin() + m, data.begin() + M, gen, num_threads);
       count += M-m;
       cum_count += M-m;
+      m += batch_size * num_threads;
     }
   }
   std::cout << std::endl;
