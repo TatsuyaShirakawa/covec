@@ -187,7 +187,7 @@ namespace{
   struct Config
   {
     Config()
-      : order(2), dim(128), batch_size(512), num_epochs(1)
+      : order(2), dim(128), batch_size(32), num_epochs(1)
       , neg_size(1), num_threads(8)
       , sigma(1.0e-1), eta0(5e-3), eta1(1e-5)
       , input_file(), output_prefix("result"), sep('\t')
@@ -218,7 +218,7 @@ namespace{
       "usage: " + program_name + " -i input_file [ options ]\n"
       + "Options and arguments:\n"
       "--dim, -d DIM=128                       : the dimension of vectors\n"
-      "--batch_size, -b BATCH_SIZE=512         : the (mini)batch size\n"
+      "--batch_size, -b BATCH_SIZE=32          : the (mini)batch size\n"
       "--num_epochs, -n NUM_EPOCHS=1           : the number of epochs\n"
       "--neg_size, -N NEGSIZE=1                : the size of negative sampling\n"
       "--num_threads, -T NUM_THREADS=8         : the number of threads\n"

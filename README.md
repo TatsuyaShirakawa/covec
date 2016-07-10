@@ -34,7 +34,7 @@ $ covec -h
 usage: ./covec -i input_file [ options ]
 Options and arguments:
 --dim, -d DIM=128                       : the dimension of vectors
---batch_size, -b BATCH_SIZE=512         : the (mini)batch size
+--batch_size, -b BATCH_SIZE=32          : the (mini)batch size
 --num_epochs, -n NUM_EPOCHS=1           : the number of epochs
 --neg_size, -N NEGSIZE=1                : the size of negative sampling
 --num_threads, -T NUM_THREADS=8         : the number of threads
