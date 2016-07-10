@@ -400,9 +400,9 @@ int main(int narg, const char** argv)
   }
 
   std::cout << "creating distributions..." << std::endl;
-  std::vector<std::shared_ptr<std::discrete_distribution<double> > > probs;
+  std::vector<std::shared_ptr<std::discrete_distribution<int> > > probs;
   for(std::size_t i=0; i < codebooks.size(); ++i){
-    probs.push_back( std::make_shared<std::discrete_distribution<double> >
+    probs.push_back( std::make_shared<std::discrete_distribution<int> >
 		     (codebooks[i].counts().begin(), codebooks[i].counts().end())
 		     );
   }
