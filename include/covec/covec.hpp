@@ -74,10 +74,8 @@ namespace covec{
   public:
 
     template <class InputIterator, class RandomGenerator>
-    void update_batch(InputIterator beg, InputIterator end, RandomGenerator& gen,
-		      const std::size_t num_threads=4);
-
-  private:
+    void update_batch(InputIterator beg, InputIterator end, RandomGenerator& gen);
+		      
 
     template <class InputIterator, class GradIterator, class RandomGenerator>
     void update_batch_thread(InputIterator beg, InputIterator end, GradIterator gbeg, RandomGenerator& gen);    
@@ -283,6 +281,7 @@ namespace covec{
     for(auto itr = beg; itr != end; ++itr){
       // gradient from positive sample
       assert(gitr->size() == order() );
+      assert( itr->size() == order() );
       accumulate_grad(*gitr, *itr, POSITIVE);
       ++gitr;
       // gradient(s) from negative sample      
@@ -291,6 +290,7 @@ namespace covec{
 	  std::size_t j = this->probs_[i]->operator()(gen);
 	  negative_sample[i] = j;
 	}
+	assert( negative_sample.size() == order() );
 	accumulate_grad(*gitr, negative_sample, NEGATIVE);
 	++gitr;
       }
@@ -320,11 +320,12 @@ namespace covec{
   template <class Real>
   template <class InputIterator, class RandomGenerator>
   void Covec<Real>::update_batch(InputIterator beg, InputIterator end,
-				 RandomGenerator& gen, const std::size_t num_threads)
+				 RandomGenerator& gen)
   {
     typedef std::pair<std::size_t, std::vector<Real> > j_grad;
-    static std::vector< std::vector< j_grad > > grads; // data_idx -> order -> entry -> dim -> value
-    typedef typename std::vector<std::vector< j_grad > >::iterator GradIterator;
+    //    static std::vector< std::vector< j_grad > > grads; // data_idx -> order -> entry -> dim -> value
+    static std::vector< std::vector< j_grad > > grads; // data_idx -> order -> entry -> dim -> value    
+
     // reserve sizes of grads
     std::size_t pos_data_size = static_cast<std::size_t>(std::distance(beg, end));
     std::size_t data_size = (1 + this->neg_size()) * pos_data_size; 
@@ -335,33 +336,8 @@ namespace covec{
 		   );
     }
 
-    if(num_threads == 1){
-      update_batch_thread(beg, end, grads.begin(), gen);
-    }else{
-      // multithread
-      std::size_t N = std::min(num_threads, pos_data_size);
-      assert( N > 0 );
-      std::vector<std::thread> threads(N);      
-      std::size_t step = pos_data_size / N;
-      std::size_t grad_step = (1 + this->neg_size()) * step;
-      assert( step > 0 );
-      for(std::size_t n = 0; n < N; ++n){
-	if(n + 1 < N){
-	  threads[n] =  std::thread(&Covec::update_batch_thread<InputIterator, GradIterator, RandomGenerator>,
-				    this,
-				    beg + n * step, beg + (n+1) * step,
-				    grads.begin() + n * grad_step, std::ref(gen) );
-	}else{
-	  threads[n] =  std::thread(&Covec::update_batch_thread<InputIterator, GradIterator, RandomGenerator>,
-				    this,
-				    beg + n * step, end,
-				    grads.begin() + n * grad_step, std::ref(gen) );
-	}
-      }
-      for(std::size_t n = 0; n < N; ++n){
-	threads[n].join();
-      }
-    }
+    // single thread
+    update_batch_thread(beg, end, grads.begin(), gen);
 
   } // end of update_batch
 

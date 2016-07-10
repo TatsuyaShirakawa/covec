@@ -9,6 +9,8 @@
 #include <random>
 #include <unordered_map>
 #include <chrono>
+#include <thread>
+#include <unistd.h>
 
 #include "covec/covec.hpp"
 
@@ -351,6 +353,30 @@ namespace{
 
   } // end of save
 
+
+  template <class Real, class InputIterator, class RandomGenerator>
+    void run_thread(Covec<Real>& cv, InputIterator beg, InputIterator end,
+		    const std::size_t batch_size,
+		    RandomGenerator& gen)
+  {
+    std::size_t M = static_cast<std::size_t>(std::distance(beg, end));
+    
+    typedef std::pair<std::size_t, std::vector<Real> > j_grad;
+    std::vector< std::vector< j_grad > >
+      grads(batch_size * (1 + cv.neg_size()),
+	    std::vector< j_grad >( cv.order(),
+				   j_grad( 0, std::vector<Real>(cv.dimension()) )
+				   )
+	    ); // data_idx -> order -> entry -> dim -> value
+
+    assert( grads[0].size() == cv.order() );
+    for(std::size_t m = 0; m < M; m += batch_size){
+      auto cur_beg = beg + m;
+      auto cur_end = beg + std::min( m + batch_size, M );
+      cv.update_batch_thread(cur_beg, cur_end, grads.begin(), gen);
+    }
+  }
+
 } // end of anonymous namespace
 
 
@@ -408,34 +434,74 @@ int main(int narg, const char** argv)
   }
   std::cout << "creating covec..." << std::endl;
   Covec<Real> cv(probs, gen, dim, sigma, neg_size, eta0, eta1);
-  std::size_t count = 0, cum_count = 0, every_count = 300000;
+  std::size_t cum_count = 0, every_count = 1000000;
   auto tick = std::chrono::system_clock::now();
+  auto start = tick;
   for(std::size_t epoch=0; epoch<num_epochs; ++epoch){
     std::srand(gen());
     if(shuffle_enabled){ std::random_shuffle(data.begin(), data.end()); }
-    for(std::size_t m=0; m < data.size();){
 
-      if(count >= every_count){ // reporting
-	auto tack = std::chrono::system_clock::now();
-	auto millisec = std::chrono::duration_cast<std::chrono::milliseconds>(tack - tick).count();
-	double percent = (cum_count * 100.0) / (data.size() * num_epochs);
-	std::size_t words_per_sec = (1000*count) / millisec;
-	std::cout << "\r"
-		  << "epoch " << std::right << std::setw(3) << epoch+1 << "/" << num_epochs
-		  << "  " << std::left << std::setw(5) << std::fixed << std::setprecision(2) << percent << " %"
-		  << "  " << std::left << std::setw(6) << words_per_sec << " words/sec."
-		  << std::flush;
+    for(std::size_t m = 0; m < data.size(); m += every_count){
 
-	count = 0;
-	tick = std::chrono::system_clock::now();
+      std::size_t count = std::min(m + every_count, data.size()) - m; // the number of data in this round
+      
+      std::size_t step = count / num_threads; // data / thread
+
+      // multi thread update
+      std::vector<std::thread> threads(num_threads);
+      for(std::size_t n=0; n < num_threads; ++n){
+	if(n + 1 < num_threads){
+	  threads[n] = std::thread(&::run_thread<Real,
+				   std::vector<std::vector<std::size_t> >::const_iterator,
+				   std::mt19937
+				   >,
+				   std::ref(cv),
+				   data.cbegin() + m + n * step,
+				   data.cbegin() + m + (n+1) * step,
+				   batch_size,
+				   std::ref(gen));
+	  assert( m + (n+1) * step <= data.size() );
+	}else{
+	  threads[n] = std::thread(&::run_thread<Real,
+				   std::vector<std::vector<std::size_t> >::const_iterator,
+				   std::mt19937
+				   >,
+				   std::ref(cv),
+				   data.cbegin() + m + n * step,
+				   data.cbegin() + m + count,
+				   batch_size,
+				   std::ref(gen));
+	  assert( std::min(m + every_count, data.size()) <= data.size() );	  
+	}
       }
-      const std::size_t M = std::min(m + batch_size * num_threads, data.size());
-      cv.update_batch(data.begin() + m, data.begin() + M, gen, num_threads);
-      count += M-m;
-      cum_count += M-m;
-      m += batch_size * num_threads;
+      for(std::size_t n=0; n < num_threads; ++n){
+	threads[n].join();
+      }
+
+      cum_count += count;
+      
+      // report
+      auto tack = std::chrono::system_clock::now();
+      auto millisec = std::chrono::duration_cast<std::chrono::milliseconds>(tack - tick).count();
+      double percent = (cum_count * 100.0) / (data.size() * num_epochs);
+      std::size_t words_per_sec = (1000*every_count) / millisec;
+      std::cout << "\r"
+		<< "epoch " << std::right << std::setw(3) << epoch+1 << "/" << num_epochs
+		<< "  " << std::left << std::setw(5) << std::fixed << std::setprecision(2) << percent << " %"
+		<< "  " << std::left << std::setw(6) << words_per_sec << " words/sec."
+		<< std::flush;
+      tick = std::chrono::system_clock::now();
+
     }
   }
+
+  auto tack = std::chrono::system_clock::now();
+  auto millisec = std::chrono::duration_cast<std::chrono::milliseconds>(tack - start).count();
+  std::size_t words_per_sec = (1000 * data.size() * num_epochs) / millisec;
+  std::cout << "\r" << "average: " 
+	    << std::left << std::setw(6)
+	    << words_per_sec << " words/sec." << std::endl;
+
   std::cout << std::endl;
   std::cout << "saving..." << std::endl;
   save(output_prefix, cv, codebooks);
