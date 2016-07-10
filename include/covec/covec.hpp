@@ -75,6 +75,11 @@ namespace covec{
     template <class InputIterator, class RandomGenerator>
     void update_batch(InputIterator beg, InputIterator end, RandomGenerator& gen);
 
+  private:
+
+    template <class InputIterator, class GradIterator, class RandomGenerator>
+    void update_batch_thread(InputIterator beg, InputIterator end, GradIterator gbeg, RandomGenerator& gen);    
+
   public:
 
     inline const std::size_t order() const
@@ -195,7 +200,7 @@ namespace covec{
 
     // count the occurences and
     // compute Hadamard product, inner_product, sigmoid of inner_product
-    static std::vector<Real> Hadamard_product(this->dimension(), 1.0);
+    std::vector<Real> Hadamard_product(this->dimension(), 1.0);
     for(std::size_t i = 0, I = this->order(); i < I; ++i){
       const auto j = sample[i];
       ++this->cs_[i][j];
@@ -212,13 +217,17 @@ namespace covec{
     // compute gradients
     for(std::size_t i = 0, I = this->order(); i < I; ++i){
       const auto& j = sample[i];
+      ++this->cs_[i][j];
       const auto& v = this->vs_[i][j];
       auto& grad_i = grad[i];
       grad_i.first = j;
       auto& g = grad_i.second;
+      auto eta = this->eta0_ / this->cs_[i][j];
+      if(eta < this->eta1_){ eta = this->eta1_; }
+      const auto C = coeff * eta;
       for(std::size_t k = 0, K = this->dimension(); k < K; ++k){
 	if( Hadamard_product[k] == 0 ){ continue; }
-	g[k] = coeff * Hadamard_product[k] / v[k];
+	g[k] = C * Hadamard_product[k] / v[k];
       }
     }
 
@@ -251,12 +260,60 @@ namespace covec{
       assert( grad_i.second.size() == this->dimension() );      
       auto& g = grad_i.second;
       const auto& v = (i == 0 ? v1 : v0);
+      auto eta = this->eta0_ / this->cs_[i][j];
+      if(eta < this->eta1_){ eta = this->eta1_; }
+      const auto C = coeff * eta;
       for(std::size_t k = 0, K = this->dimension(); k < K; ++k){
-	g[k] = coeff * v[k];
+	g[k] = C * v[k];
       }
     }
   }
 
+  template <class Real>
+  template <class InputIterator, class GradIterator, class RandomGenerator>
+  void Covec<Real>::update_batch_thread(InputIterator beg, InputIterator end,
+					GradIterator gbeg,
+					RandomGenerator& gen)
+  {
+    // accumulate gradients
+    std::vector<std::size_t> negative_sample(this->order());
+    auto gitr = gbeg;
+    for(auto itr = beg; itr != end; ++itr){
+      // gradient from positive sample
+      accumulate_grad(*gitr, *itr, POSITIVE);
+      ++gitr;
+      // gradient(s) from negative sample      
+      for(std::size_t m = 0, M = this->neg_size(); m < M; ++m){
+	for(std::size_t i = 0, I = this->order(); i < I; ++i){
+	  std::size_t j = this->probs_[i]->operator()(gen);
+	  negative_sample[i] = j;
+	}
+	accumulate_grad(*gitr, negative_sample, NEGATIVE);
+	++gitr;
+      }
+    }
+    
+    auto gend = gitr;
+    
+    // update
+    for(auto gitr = gbeg; gitr != gend; ++gitr){
+      const auto& grad = *gitr;
+      for(std::size_t i = 0, I = this->order(); i < I; ++i){
+	auto& vs_i = this->vs_[i];
+	const auto& grad_i = grad[i];
+	// update sqgs, vs
+	const auto j = grad_i.first;
+	const auto& grad_ij = grad_i.second;
+	auto& vs_ij = vs_i[j];
+	for(std::size_t k = 0, K = this->dimension(); k < K; ++k){
+	  vs_ij[k] += grad_ij[k];
+	}
+      }
+    }
+    
+  }
+
+  
   template <class Real>
   template <class InputIterator, class RandomGenerator>
   void Covec<Real>::update_batch(InputIterator beg, InputIterator end, RandomGenerator& gen)
@@ -274,42 +331,7 @@ namespace covec{
 		   );
     }
 
-    // accumulate gradients
-    static std::vector<std::size_t> negative_sample(this->order());
-    std::size_t idx=0;
-    for(auto itr = beg; itr != end; ++itr){
-      // gradient from positive sample
-      accumulate_grad(grads[idx], *itr, POSITIVE);
-      ++idx;
-      // gradient(s) from negative sample      
-      for(std::size_t m = 0, M = this->neg_size(); m < M; ++m){
-	for(std::size_t i = 0, I = this->order(); i < I; ++i){
-	  std::size_t j = this->probs_[i]->operator()(gen);
-	  negative_sample[i] = j;
-	}
-	accumulate_grad(grads[idx], negative_sample, NEGATIVE);
-	++idx;
-      }
-    }
-
-    // update
-    for(std::size_t idx = 0; idx < data_size; ++idx){
-      const auto& grad = grads[idx];
-      for(std::size_t i = 0, I = this->order(); i < I; ++i){
-	auto& vs_i = this->vs_[i];
-	const auto& cs_i = this->cs_[i];
-	const auto& grad_i = grad[i];
-	// update sqgs, vs
-	const auto j = grad_i.first;
-	const auto& grad_ij = grad_i.second;
-	auto& vs_ij = vs_i[j];
-	Real eta = this->eta0_ / cs_i[j];
-	if(eta < this->eta1_){ eta = this->eta1_; }
-	for(std::size_t k = 0, K = this->dimension(); k < K; ++k){
-	  vs_ij[k] += eta * grad_ij[k];
-	}
-      }
-    }
+    update_batch_thread(beg, end, grads.begin(), gen);
 
   } // end of update_batch
 
