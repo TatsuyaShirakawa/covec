@@ -101,16 +101,24 @@ namespace{
   }; // end of CodeBook
 
 
-  bool load(std::vector<CodeBook>& codebooks,
+  bool load(std::vector<std::shared_ptr<CodeBook> >& codebooks,
 	    std::vector<std::vector<std::size_t> >& data,
 	    const std::string& input_file,
 	    const std::size_t order,
 	    const char sep,
-	    bool sort_enabled
+	    bool sort_enabled,
+	    bool shared_enabled
 	    )
   {
     codebooks.clear();
-    codebooks.resize(2);
+    codebooks.resize(order);
+    for(std::size_t i = 0; i < order; ++i){
+      if(shared_enabled && i > 0){
+	codebooks[i] = codebooks[0];
+      }else{
+	codebooks[i] = std::make_shared<CodeBook>();
+      }
+    }
 
     std::ifstream fin(input_file.c_str());
     if(!fin || !fin.good()){
@@ -127,7 +135,7 @@ namespace{
       std::size_t i=0;
       do{
 	pos_to = line.find_first_of(sep, pos_from);
-	std::size_t code = codebooks[i].entry(line.substr(pos_from, pos_to-pos_from));
+	std::size_t code = codebooks[i]->entry(line.substr(pos_from, pos_to-pos_from));
 	instance[i] = code;
 	if(pos_to == std::string::npos){
 	  pos_from = std::string::npos;
@@ -154,7 +162,9 @@ namespace{
       // renew encodings so that they are sorted by descending order of frequency
       std::cout << "reindex..." << std::endl;
       for(std::size_t i = 0; i < order; ++i){
-	codebooks[i].reindex();
+	if(i == 0 || !shared_enabled){
+	  codebooks[i]->reindex();
+	}
       }
 
       // create data
@@ -168,7 +178,7 @@ namespace{
 	std::size_t i=0;
 	do{
 	  pos_to = line.find_first_of(sep, pos_from);
-	  std::size_t code = codebooks[i].encode(line.substr(pos_from, pos_to-pos_from));
+	  std::size_t code = codebooks[i]->encode(line.substr(pos_from, pos_to-pos_from));
 	  instance[i] = code;
 	  if(pos_to == std::string::npos){
 	    pos_from = std::string::npos;
@@ -339,7 +349,7 @@ namespace{
   }
 
 
-  void save(const std::string& output_prefix, const Covec<Real>& cv, const std::vector<CodeBook>& codebooks)
+  void save(const std::string& output_prefix, const Covec<Real>& cv, const std::vector<std::shared_ptr<CodeBook> >& codebooks)
   {
     // vectors
     const auto& vs = cv.vectors();
@@ -353,7 +363,7 @@ namespace{
       }
 
       const auto& vs_i = *vs[i];
-      const auto& codebooks_i = codebooks[i];
+      const auto& codebooks_i = *codebooks[i];
       for(std::size_t j = 0, J = vs_i.size(); j < J; ++j){
 	const auto& vs_ij = vs_i[j];
 	fout << codebooks_i.decode(j);
@@ -430,17 +440,17 @@ int main(int narg, const char** argv)
   std::cout << "  " <<  "sort         : " << std::boolalpha << sort_enabled << std::endl;
   std::cout << "  " <<  "shared       : " << std::boolalpha << shared_enabled << std::endl;  
 
-  std::vector<CodeBook> codebooks;
+  std::vector<std::shared_ptr<CodeBook> > codebooks;
   std::vector<std::vector<std::size_t> > data;
   std::mt19937 gen(0);
   std::cout << "loading " << input_file << "..." << std::endl;;
-  load(codebooks, data, input_file, order, sep, sort_enabled);
+  load(codebooks, data, input_file, order, sep, sort_enabled, shared_enabled);
   std::cout << data.size() << std::endl;
 
   std::cout << "data size: " << data.size() << std::endl;
   std::cout << "codebook sizes:" << std::endl;
   for(std::size_t i=0; i<order; ++i){
-    std::cout << "  " << i << ": " << codebooks[i].size() << std::endl;
+    std::cout << "  " << i << ": " << codebooks[i]->size() << std::endl;
   }
 
   std::cout << "creating distributions..." << std::endl;
@@ -450,7 +460,7 @@ int main(int narg, const char** argv)
       probs.push_back(probs[0]);
     }else{
       probs.push_back( std::make_shared<std::discrete_distribution<int> >
-		       (codebooks[i].counts().begin(), codebooks[i].counts().end())
+		       (codebooks[i]->counts().begin(), codebooks[i]->counts().end())
 		       );
     }
   }
