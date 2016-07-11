@@ -195,7 +195,7 @@ namespace{
       , eta0(static_cast<Real>(5e-3))
       , eta1(static_cast<Real>(1e-5))
       , input_file(), output_prefix("result"), sep('\t')
-      , shuffle_enabled(false), sort_enabled(false)
+      , shuffle_enabled(false), sort_enabled(false), shared_enabled(false)
     {}
 
     std::size_t order;
@@ -212,6 +212,7 @@ namespace{
     char sep;
     bool shuffle_enabled;
     bool sort_enabled;
+    bool shared_enabled;
   }; // end of Config
 
   Config parse_args(int narg, const char** argv)
@@ -234,7 +235,8 @@ namespace{
       "--sep, -S SEP='" "\t" "'                       : separator of each line in INPUT_FILE\n"
       "--help, -h                              : show this help message\n"
       "--shuffle                               : enuable the switch to shuffle data before every epoch\n"
-      "--sort                                  : sort entries by descending order of frequency"
+      "--sort                                  : sort entries by descending order of frequency\n"
+      "--shared                                : vectors of each order are shared"
       ;
     bool input_file_found = false;
     for(int i=1; i<narg; ++i){
@@ -291,6 +293,8 @@ namespace{
 	result.shuffle_enabled = true;
       }else if( match(argv[i], "--sort") ){
 	result.sort_enabled = true;
+      }else if( match(argv[i], "--shared") ){
+	result.shared_enabled = true;
       }else if( match(argv[i], "--help", "-h") ){
 	std::cout << help_message << std::endl;
 	exit(0);
@@ -348,7 +352,7 @@ namespace{
 	exit(1);
       }
 
-      const auto& vs_i = vs[i];
+      const auto& vs_i = *vs[i];
       const auto& codebooks_i = codebooks[i];
       for(std::size_t j = 0, J = vs_i.size(); j < J; ++j){
 	const auto& vs_ij = vs_i[j];
@@ -407,9 +411,10 @@ int main(int narg, const char** argv)
   const std::size_t order = detect_order(input_file, sep);
   const bool shuffle_enabled = config.shuffle_enabled;
   const bool sort_enabled = config.sort_enabled;
+  const bool shared_enabled = config.shared_enabled;
 
   std::cout << "config:" << std::endl;
-  std::cout << "  " << "dim          : " << dim << std::endl;
+  std::cout << "  " <<  "dim          : " << dim << std::endl;
   std::cout << "  " <<  "batch_size   : " << batch_size << std::endl;
   std::cout << "  " <<  "num_epochs   : " << num_epochs << std::endl;
   std::cout << "  " <<  "neg_size     : " << neg_size << std::endl;
@@ -421,6 +426,9 @@ int main(int narg, const char** argv)
   std::cout << "  " <<  "output_vector_file  : " << output_prefix + ".<#>.tsv" << std::endl;
   std::cout << "  " <<  "sep          : " << "\"" << sep << "\"" << std::endl;
   std::cout << "  " <<  "order        : " << order << std::endl;
+  std::cout << "  " <<  "shuffle      : " << std::boolalpha << shuffle_enabled << std::endl;
+  std::cout << "  " <<  "sort         : " << std::boolalpha << sort_enabled << std::endl;
+  std::cout << "  " <<  "shared       : " << std::boolalpha << shared_enabled << std::endl;  
 
   std::vector<CodeBook> codebooks;
   std::vector<std::vector<std::size_t> > data;
@@ -438,13 +446,19 @@ int main(int narg, const char** argv)
   std::cout << "creating distributions..." << std::endl;
   std::vector<std::shared_ptr<std::discrete_distribution<int> > > probs;
   for(std::size_t i=0; i < codebooks.size(); ++i){
-    probs.push_back( std::make_shared<std::discrete_distribution<int> >
-		     (codebooks[i].counts().begin(), codebooks[i].counts().end())
-		     );
+    if(shared_enabled && i > 0){
+      probs.push_back(probs[0]);
+    }else{
+      probs.push_back( std::make_shared<std::discrete_distribution<int> >
+		       (codebooks[i].counts().begin(), codebooks[i].counts().end())
+		       );
+    }
   }
   
   std::cout << "creating covec..." << std::endl;
-  Covec<Real> cv(probs, gen, dim, sigma, neg_size, eta0, eta1);
+  Covec<Real> cv(probs, gen, dim, sigma, neg_size, eta0, eta1, shared_enabled);
+
+  std::cout << "start training..." << std::endl;
   std::size_t cum_count = 0, every_count = 1000000;
   auto tick = std::chrono::system_clock::now();
   auto start = tick;

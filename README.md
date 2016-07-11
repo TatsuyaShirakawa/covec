@@ -60,5 +60,6 @@ Options and arguments:
 --help, -h                              : show this help message
 --shuffle                               : enuable the switch to shuffle data before every epoch
 --sort                                  : sort entries by descending order of frequency
+--shared                                : vectors of each order are shared
 ```
 

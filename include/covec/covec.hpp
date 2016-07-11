@@ -24,17 +24,18 @@ namespace covec{
 	  const Real sigma = 1.0e-1,
 	  const std::size_t neg_size = 1,
 	  const Real eta0 = 5e-3, // initial learning rate
-	  const Real eta1 = 1e-5  // final learning rate
+	  const Real eta1 = 1e-5,  // final learning rate
+	  const bool shared = false // if true vectors of each order are shared
 	  )
       : num_entries_(), dim_(), neg_size_(), eta0_(), eta1_()
-      , vs_(), cs_()
+      , vs_(), cs_(), shared_()
     {
       std::vector<std::shared_ptr<std::discrete_distribution<int> > > probs;
       for(const auto& counts : each_counts){
 	auto prob = std::make_shared<std::discrete_distribution<int> >(counts.begin(), counts.end());
 	probs.push_back(prob);
       }
-      this->initialize(probs, gen, dim, sigma, neg_size, eta0, eta1);
+      this->initialize(probs, gen, dim, sigma, neg_size, eta0, eta1, shared);
     }
 
     template <class InputIterator, class RandomGenerator>
@@ -44,10 +45,11 @@ namespace covec{
 	  const Real sigma = 1.0e-1,
 	  const std::size_t neg_size = 1,
 	  const Real eta0 = 5e-3, // learning rate
-	  const Real eta1 = 1e-5 // final learning rate
+	  const Real eta1 = 1e-5, // final learning rate
+	  bool shared = false // if true vectors of each order are shared	  
 	  )
       : num_entries_(), dim_(), neg_size_(), eta0_(), eta1_()
-      , vs_(), cs_()
+      , vs_(), cs_(), shared_()
     {
       std::vector<std::shared_ptr<std::discrete_distribution<int> > > probs;
       for(const auto&& beg_and_end : begs_and_ends){
@@ -55,7 +57,7 @@ namespace covec{
 	auto prob = std::make_shared<std::discrete_distribution<int> >(beg, end);
 	probs.push_back(prob);
       }
-      this->initialize(probs, gen, dim, sigma, neg_size, eta0, eta1);
+      this->initialize(probs, gen, dim, sigma, neg_size, eta0, eta1, shared);
     }
 
     template <class RandomGenerator>
@@ -65,11 +67,12 @@ namespace covec{
 	  const Real sigma = 1.0e-1,
 	  const std::size_t neg_size = 1,
 	  const Real eta0 = 5e-3, // learning rate
-	  const Real eta1 = 1e-5 // final learning rate
+	  const Real eta1 = 1e-5, // final learning rate
+	  bool shared = false // if true vectors of each order are shared	  
 	  )
       : num_entries_(), dim_(), neg_size_(), eta0_()
-      , vs_(), cs_()
-    { this->initialize(probs, gen, dim, sigma, neg_size, eta0, eta1); }
+      , vs_(), cs_(), shared_()
+    { this->initialize(probs, gen, dim, sigma, neg_size, eta0, eta1, shared); }
 
   public:
 
@@ -85,10 +88,10 @@ namespace covec{
     inline const std::size_t order() const
     { return this->num_entries_.size(); }
 
-    inline const std::vector<std::size_t>& num_entries() const
+    inline const std::vector<std::shared_ptr<std::size_t> >& num_entries() const
     { return this->num_entries_; }
 
-    inline const std::vector<std::vector<std::vector<Real> > >& vectors() const
+    inline const std::vector<std::shared_ptr<std::vector<std::vector<Real> > > >& vectors() const
     { return this->vs_; }
 
     inline const std::size_t dimension() const
@@ -103,6 +106,9 @@ namespace covec{
     inline const Real eta1() const
     { return this->eta1_; }
 
+    inline bool shared() const
+    { return this->shared_; }
+
   private:
 
     template <class RandomGenerator>
@@ -112,7 +118,8 @@ namespace covec{
 		    const Real sigma = 1.0e-1,
 		    const std::size_t neg_size = 1,
 		    const Real eta0 = 5e-3,
-		    const Real eta1 = 1e-5
+		    const Real eta1 = 1e-5,
+		    bool shared = false // if true vectors of each order are shared		    
 		    );
 
     typedef enum { POSITIVE, NEGATIVE } POS_NEG;
@@ -129,15 +136,16 @@ namespace covec{
 			   , const POS_NEG pos_neg);
 
   private:
-    std::vector<std::size_t> num_entries_; // order -> # of entries
+    std::vector<std::shared_ptr<std::size_t> > num_entries_; // order -> # of entries
     std::size_t dim_;
     std::size_t neg_size_;
     Real eta0_;
     Real eta1_;
     std::vector<std::shared_ptr<std::discrete_distribution<int> > > probs_;
-    std::vector<std::vector<std::vector<Real> > > vs_; // order -> entry -> dim -> value
-    std::vector<std::vector<std::size_t> > cs_; // counts of occurrencees
-
+    //    std::vector<std::vector<std::vector<Real> > > vs_; // order -> entry -> dim -> value
+    std::vector<std::shared_ptr<std::vector<std::vector<Real> > > > vs_; // order -> entry -> dim -> value    
+    std::vector<std::shared_ptr<std::vector<std::size_t> > > cs_; // counts of occurrencees
+    bool shared_;
   }; // end of Covectorizer
 
   // -------------------------------------------------------------------------------
@@ -150,7 +158,8 @@ namespace covec{
 			       const Real sigma,
 			       const std::size_t neg_size,
 			       const Real eta0,
-			       const Real eta1
+			       const Real eta1,
+			       const bool shared
 			       )
   {
     this->probs_ = probs;
@@ -158,7 +167,8 @@ namespace covec{
     this->neg_size_ = neg_size;
     this->eta0_ = eta0;
     this->eta1_ = eta1;
-
+    this->shared_ = shared;
+    
     this->num_entries_.clear();
     this->vs_.clear();
     this->cs_.clear();
@@ -166,23 +176,38 @@ namespace covec{
     std::size_t order = this->probs_.size();
     this->vs_.resize(order);
     this->cs_.resize(order);
-
+    this->num_entries_.resize(order);
     std::normal_distribution<Real> normal(0.0, sigma);
     for(std::size_t i = 0; i < order; ++i){
-      const auto& prob = this->probs_[i];
-      this->num_entries_.push_back(prob->probabilities().size());
-      std::size_t num_entries = prob->probabilities().size();
-      auto& vs = this->vs_[i];
-      vs.resize(num_entries);
-      for(std::size_t j = 0; j < num_entries; ++j){
-	std::vector<Real> v(this->dim_);
-	for(std::size_t k = 0, K = this->dimension(); k < K; ++k){
-	  v[k] = normal(gen);
-	}
-	vs[j] = v;
-      }
+      if(this->shared() && i > 0){
+	assert(this->probs_[i] == this->probs_[0]);
+	this->vs_[i] = this->vs_[0];
+	this->num_entries_[i] = this->num_entries_[0];
+	this->cs_[i] = this->cs_[0];
+      }else{
+	const auto& prob = this->probs_[i];
 
-      this->cs_[i] = std::vector<std::size_t>(num_entries, 0);
+	// allocate
+	this->num_entries_[i] =
+	  std::make_shared<std::size_t>(prob->probabilities().size());
+	std::size_t num_entries = prob->probabilities().size();
+	this->vs_[i] =
+	  std::make_shared<std::vector<std::vector<Real> > >
+	  (num_entries, std::vector<Real>(this->dimension()));
+	this->cs_[i] =
+	  std::make_shared<std::vector<std::size_t> >(num_entries);
+	   
+	auto& vs = *this->vs_[i];
+	vs.resize(num_entries);
+	for(std::size_t j = 0; j < num_entries; ++j){
+	  std::vector<Real> v(this->dim_);
+	  for(std::size_t k = 0, K = this->dimension(); k < K; ++k){
+	    v[k] = normal(gen);
+	  }
+	  vs[j] = v;
+	}
+	this->cs_[i] = std::make_shared<std::vector<std::size_t> >(num_entries, 0);
+      }
     }
   }
 
@@ -203,8 +228,8 @@ namespace covec{
     std::vector<Real> Hadamard_product(this->dimension(), 1.0);
     for(std::size_t i = 0, I = this->order(); i < I; ++i){
       const auto j = sample[i];
-      ++this->cs_[i][j];
-      const auto& v = this->vs_[i][j];
+      ++(*this->cs_[i])[j];
+      const auto& v = (*this->vs_[i])[j];
       assert( v.size() == this->dimension() );
       for(std::size_t k = 0, K = this->dimension(); k < K; ++k){
 	Hadamard_product[k] *= v[k];
@@ -218,12 +243,12 @@ namespace covec{
     // compute gradients
     for(std::size_t i = 0, I = this->order(); i < I; ++i){
       const auto& j = sample[i];
-      ++this->cs_[i][j];
-      const auto& v = this->vs_[i][j];
+      ++(*this->cs_[i])[j];
+      const auto& v = (*this->vs_[i])[j];
       auto& grad_i = grad[i];
       grad_i.first = j;
       auto& g = grad_i.second;
-      auto eta = this->eta0_ / this->cs_[i][j];
+      auto eta = this->eta0_ / (*this->cs_[i])[j];
       if(eta < this->eta1_){ eta = this->eta1_; }
       const auto C = coeff * eta;
       for(std::size_t k = 0, K = this->dimension(); k < K; ++k){
@@ -245,8 +270,8 @@ namespace covec{
 
     // count the occurences and
     // compute Hadamard product, inner_product, sigmoid of inner_product
-    const auto& v0 = this->vs_[0][sample[0]];
-    const auto& v1 = this->vs_[1][sample[1]];
+    const auto& v0 = (*this->vs_[0])[sample[0]];
+    const auto& v1 = (*this->vs_[1])[sample[1]];
     const Real inner_product =
       static_cast<Real>(std::inner_product(v0.begin(), v0.end(), v1.begin(), 0.0));
     Real sigmoid = static_cast<Real>( 1.0 / ( 1 + std::exp(-inner_product) ) );
@@ -254,14 +279,14 @@ namespace covec{
 
     for(std::size_t i = 0; i < 2; ++i){
       const std::size_t j = sample[i];
-      ++this->cs_[i][j];
+      ++(*this->cs_[i])[j];
       assert( grad.size() == this->order() );
       auto& grad_i = grad[i];
       grad_i.first = j;
       assert( grad_i.second.size() == this->dimension() );      
       auto& g = grad_i.second;
       const auto& v = (i == 0 ? v1 : v0);
-      auto eta = this->eta0_ / this->cs_[i][j];
+      auto eta = this->eta0_ / (*this->cs_[i])[j];
       if(eta < this->eta1_){ eta = this->eta1_; }
       const auto C = coeff * eta;
       for(std::size_t k = 0, K = this->dimension(); k < K; ++k){
@@ -303,7 +328,7 @@ namespace covec{
     for(gitr = gbeg; gitr != gend; ++gitr){
       const auto& grad = *gitr;
       for(std::size_t i = 0, I = this->order(); i < I; ++i){
-	auto& vs_i = this->vs_[i];
+	auto& vs_i = *this->vs_[i];
 	const auto& grad_i = grad[i];
 	// update sqgs, vs
 	const auto j = grad_i.first;
