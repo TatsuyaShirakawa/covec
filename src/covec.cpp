@@ -10,7 +10,6 @@
 #include <unordered_map>
 #include <chrono>
 #include <thread>
-#include <unistd.h>
 
 #include "covec/covec.hpp"
 
@@ -65,7 +64,7 @@ namespace{
     inline const std::size_t encode(const std::string& x) const
     { return this->entry2codes_.at(x); }
 
-    inline const std::string decode(const std::size_t c) const
+    inline const std::string& decode(const std::size_t c) const
     { return this->code2entries_[c]; }
 
     // reconstructin encodings by descending order of counts
@@ -151,12 +150,15 @@ namespace{
     }
 
     if(sort_enabled){
+      
       // renew encodings so that they are sorted by descending order of frequency
+      std::cout << "reindex..." << std::endl;
       for(std::size_t i = 0; i < order; ++i){
 	codebooks[i].reindex();
       }
 
       // create data
+      std::cout << "remake data..." << std::endl;      
       std::size_t data_idx = data.size();
       data.resize(data.size() + n_data);
       fin.clear(); fin.seekg(0, std::ios_base::beg);
@@ -333,7 +335,8 @@ namespace{
     const auto& vs = cv.vectors();
     for(std::size_t i = 0, I = cv.order(); i < I; ++i){
       const std::string output_file = output_prefix + "." + std::to_string(i) + ".tsv";
-      std::ofstream fout(output_file);
+
+      std::ofstream fout(output_file.c_str());
       if(!fout || !fout.good()){
 	std::cerr << "cannot open output_vector_file: " << output_file << std::endl;
 	exit(1);
@@ -364,10 +367,10 @@ namespace{
     typedef std::pair<std::size_t, std::vector<Real> > j_grad;
     std::vector< std::vector< j_grad > >
       grads(batch_size * (1 + cv.neg_size()),
-	    std::vector< j_grad >( cv.order(),
-				   j_grad( 0, std::vector<Real>(cv.dimension()) )
-				   )
-	    ); // data_idx -> order -> entry -> dim -> value
+    	    std::vector< j_grad >( cv.order(),
+    				   j_grad( 0, std::vector<Real>(cv.dimension()) )
+    				   )
+    	    ); // data_idx -> order -> entry -> dim -> value
 
     assert( grads[0].size() == cv.order() );
     for(std::size_t m = 0; m < M; m += batch_size){
@@ -418,6 +421,7 @@ int main(int narg, const char** argv)
   std::mt19937 gen(0);
   std::cout << "loading " << input_file << "..." << std::endl;;
   load(codebooks, data, input_file, order, sep, sort_enabled);
+  std::cout << data.size() << std::endl;
 
   std::cout << "data size: " << data.size() << std::endl;
   std::cout << "codebook sizes:" << std::endl;
@@ -432,6 +436,7 @@ int main(int narg, const char** argv)
 		     (codebooks[i].counts().begin(), codebooks[i].counts().end())
 		     );
   }
+  
   std::cout << "creating covec..." << std::endl;
   Covec<Real> cv(probs, gen, dim, sigma, neg_size, eta0, eta1);
   std::size_t cum_count = 0, every_count = 1000000;
@@ -484,7 +489,7 @@ int main(int narg, const char** argv)
       auto tack = std::chrono::system_clock::now();
       auto millisec = std::chrono::duration_cast<std::chrono::milliseconds>(tack - tick).count();
       double percent = (cum_count * 100.0) / (data.size() * num_epochs);
-      std::size_t words_per_sec = (1000*every_count) / millisec;
+      std::size_t words_per_sec = (1000*count) / millisec;
       std::cout << "\r"
 		<< "epoch " << std::right << std::setw(3) << epoch+1 << "/" << num_epochs
 		<< "  " << std::left << std::setw(5) << std::fixed << std::setprecision(2) << percent << " %"
