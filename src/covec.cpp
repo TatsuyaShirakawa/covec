@@ -46,19 +46,19 @@ namespace{
 	  (std::make_pair(x, code2entries_.size()));
 	itr = entried.first;
 	this->code2entries_.push_back(x);
-	this->counts_.push_back(0);
+	this->counts_.push_back(0.0);
       }
-      ++this->counts_[itr->second];
+      this->counts_[itr->second] += 1;
       return itr->second;
     }
 
     inline const std::size_t size() const
     { return this->code2entries_.size(); }
 
-    inline const std::vector<std::size_t>& counts() const
+    inline const std::vector<double>& counts() const
     { return this->counts_; }
 
-    inline const std::size_t count_of(const std::size_t c) const
+    inline const double count_of(const std::size_t c) const
     { return this->counts_[c]; }
 
     inline const std::size_t encode(const std::string& x) const
@@ -70,20 +70,20 @@ namespace{
     // reconstructin encodings by descending order of counts
     void reindex()
     {
-      std::vector<std::pair<std::size_t, std::size_t> > ind_and_counts(this->counts_.size());
-      std::vector<std::size_t> new_counts(this->counts_.size());
+      std::vector<std::pair<double, std::size_t> > count_and_inds(this->counts_.size());
+      std::vector<double> new_counts(this->counts_.size());
       std::vector<std::string> new_code2entries(this->counts_.size());
       std::unordered_map<std::string, std::size_t> new_entry2codes;
 
       for(std::size_t i = 0, I = this->counts_.size(); i < I; ++i){
-	ind_and_counts[i] = std::make_pair(this->counts_[i], i );
+	count_and_inds[i] = std::make_pair(this->counts_[i], i );
       }
 
-      std::sort(ind_and_counts.begin(), ind_and_counts.end()
-		, std::greater<std::pair<std::size_t, std::size_t> >());
-      for(std::size_t i = 0, I = ind_and_counts.size(); i < I; ++i){
-	std::size_t count = ind_and_counts[i].first,
-	  ind = ind_and_counts[i].second;
+      std::sort(count_and_inds.begin(), count_and_inds.end()
+		, std::greater<std::pair<double, std::size_t> >());
+      for(std::size_t i = 0, I = count_and_inds.size(); i < I; ++i){
+	double count = count_and_inds[i].first;
+	std::size_t ind = count_and_inds[i].second;
 	const std::string& entry = this->code2entries_[ind];
 	new_counts[i] = count;
 	new_code2entries[i] = entry;
@@ -95,7 +95,7 @@ namespace{
     }
 
   private:
-    std::vector<std::size_t> counts_;
+    std::vector<double> counts_;
     std::vector<std::string> code2entries_;
     std::unordered_map<std::string, std::size_t> entry2codes_;
   }; // end of CodeBook
@@ -191,7 +191,9 @@ namespace{
     Config()
       : order(2), dim(128), batch_size(32), num_epochs(1)
       , neg_size(1), num_threads(8)
-      , sigma(1.0e-1), eta0(5e-3), eta1(1e-5)
+      , sigma(static_cast<Real>(1.0e-1))
+      , eta0(static_cast<Real>(5e-3))
+      , eta1(static_cast<Real>(1e-5))
       , input_file(), output_prefix("result"), sep('\t')
       , shuffle_enabled(false), sort_enabled(false)
     {}
@@ -202,9 +204,9 @@ namespace{
     std::size_t num_epochs;
     std::size_t neg_size;
     std::size_t num_threads;
-    double sigma;
-    double eta0;
-    double eta1;
+    Real sigma;
+    Real eta0;
+    Real eta1;
     std::string input_file;
     std::string output_prefix;
     char sep;
@@ -259,11 +261,15 @@ namespace{
       }else if( match(argv[i], "--sigma", "-s") ){
 	double x = std::stod(argv[++i]);
 	REQUIRED_POSITIVE(x, "sigma");
-	result.sigma = x;
+	result.sigma = static_cast<Real>(x);
       }else if( match(argv[i], "--eta0", "-e") ){
 	double x = std::stod(argv[++i]);
 	REQUIRED_POSITIVE(x, "eta0");
-	result.eta0 = x;
+	result.eta0 = static_cast<Real>(x);
+      }else if( match(argv[i], "--eta1", "-E") ){
+	double x = std::stod(argv[++i]);
+	REQUIRED_POSITIVE(x, "eta1");
+	result.eta0 = static_cast<Real>(x);
       }else if( match(argv[i], "--input_file", "-i") ){
 	input_file_found = true;
 	std::string x = argv[++i];
@@ -392,9 +398,9 @@ int main(int narg, const char** argv)
   const std::size_t num_epochs = config.num_epochs;
   const std::size_t neg_size = config.neg_size;
   const std::size_t num_threads = config.num_threads;
-  const double sigma = config.sigma;
-  const double eta0 = config.eta0;
-  const double eta1 = config.eta1;
+  const Real sigma = config.sigma;
+  const Real eta0 = config.eta0;
+  const Real eta1 = config.eta1;
   const std::string input_file = config.input_file;
   const std::string output_prefix = config.output_prefix;
   const char sep = config.sep;

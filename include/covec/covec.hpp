@@ -157,7 +157,7 @@ namespace covec{
     this->dim_ = dim;
     this->neg_size_ = neg_size;
     this->eta0_ = eta0;
-    this->eta1_ = eta0;
+    this->eta1_ = eta1;
 
     this->num_entries_.clear();
     this->vs_.clear();
@@ -210,8 +210,9 @@ namespace covec{
 	Hadamard_product[k] *= v[k];
       }
     }
-    Real inner_product = std::accumulate(Hadamard_product.begin(), Hadamard_product.end(), 0.0);
-    Real sigmoid = 1.0 / ( 1 + std::exp(-inner_product) );
+    Real inner_product =
+      static_cast<Real>(std::accumulate(Hadamard_product.begin(), Hadamard_product.end(), 0.0));
+    Real sigmoid = static_cast<Real>( 1.0 / ( 1 + std::exp(-inner_product) ) );
     Real coeff = (pos_neg == POSITIVE ? 1 - sigmoid : -sigmoid);
 
     // compute gradients
@@ -247,8 +248,8 @@ namespace covec{
     const auto& v0 = this->vs_[0][sample[0]];
     const auto& v1 = this->vs_[1][sample[1]];
     const Real inner_product =
-      std::inner_product(v0.begin(), v0.end(), v1.begin(), 0.0);
-    Real sigmoid = 1.0 / ( 1 + std::exp(-inner_product) );
+      static_cast<Real>(std::inner_product(v0.begin(), v0.end(), v1.begin(), 0.0));
+    Real sigmoid = static_cast<Real>( 1.0 / ( 1 + std::exp(-inner_product) ) );
     Real coeff = (pos_neg == POSITIVE ? 1 - sigmoid : -sigmoid);
 
     for(std::size_t i = 0; i < 2; ++i){
@@ -277,6 +278,7 @@ namespace covec{
   {
     // accumulate gradients
     std::vector<std::size_t> negative_sample(this->order());
+    
     auto gitr = gbeg;
     for(auto itr = beg; itr != end; ++itr){
       // gradient from positive sample
@@ -295,11 +297,10 @@ namespace covec{
 	++gitr;
       }
     }
-    
-    auto gend = gitr;
+    auto gend = gitr;      
     
     // update
-    for(auto gitr = gbeg; gitr != gend; ++gitr){
+    for(gitr = gbeg; gitr != gend; ++gitr){
       const auto& grad = *gitr;
       for(std::size_t i = 0, I = this->order(); i < I; ++i){
 	auto& vs_i = this->vs_[i];

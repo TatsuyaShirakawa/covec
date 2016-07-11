@@ -8,9 +8,22 @@ Likewise SGNS, covec implicitly decomposes the multivariate pointwise mutual inf
 
 where < u,v,...,w > is a higher order inner product of same dimensional vectors u, v, ..., w.
 
+## requirements
+
+- compilers which support c++11
+  - culang
+  - gcc
+  - msvc
+
 ## build
 
-Run build.sh on the top of the repository, then covec will be created in the build directory.
+### using cmake
+
+```
+mkdir build && cd build
+cmake ..
+make
+```
 
 ## sample
 
