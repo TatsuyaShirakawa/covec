@@ -135,6 +135,18 @@ namespace covec{
 			   , const std::vector<std::size_t>& sample
 			   , const POS_NEG pos_neg);
 
+    inline Real next_eta(const std::size_t count) const
+    {
+      constexpr std::size_t C = 100000;
+      if(count < C){
+	auto delta = this->eta0_ - this->eta1_;
+	auto eta = this->eta1_ + (delta * (C - count)) / C;
+	return eta;
+      }else{
+	return this->eta1_;
+      }
+    }
+
   private:
     std::vector<std::shared_ptr<std::size_t> > num_entries_; // order -> # of entries
     std::size_t dim_;
@@ -243,13 +255,13 @@ namespace covec{
     // compute gradients
     for(std::size_t i = 0, I = this->order(); i < I; ++i){
       const auto& j = sample[i];
-      ++(*this->cs_[i])[j];
+      auto& cs_ij = (*this->cs_[i])[j];
+      ++cs_ij;
       const auto& v = (*this->vs_[i])[j];
       auto& grad_i = grad[i];
       grad_i.first = j;
       auto& g = grad_i.second;
-      auto eta = this->eta0_ / (*this->cs_[i])[j];
-      if(eta < this->eta1_){ eta = this->eta1_; }
+      auto eta = this->next_eta(cs_ij);
       const auto C = coeff * eta;
       for(std::size_t k = 0, K = this->dimension(); k < K; ++k){
 	if( Hadamard_product[k] == 0 ){ continue; }
@@ -279,15 +291,15 @@ namespace covec{
 
     for(std::size_t i = 0; i < 2; ++i){
       const std::size_t j = sample[i];
-      ++(*this->cs_[i])[j];
+      auto& cs_ij = (*this->cs_[i])[j];
+      ++cs_ij;
       assert( grad.size() == this->order() );
       auto& grad_i = grad[i];
       grad_i.first = j;
       assert( grad_i.second.size() == this->dimension() );      
       auto& g = grad_i.second;
       const auto& v = (i == 0 ? v1 : v0);
-      auto eta = this->eta0_ / (*this->cs_[i])[j];
-      if(eta < this->eta1_){ eta = this->eta1_; }
+      auto eta = this->next_eta(cs_ij);
       const auto C = coeff * eta;
       for(std::size_t k = 0, K = this->dimension(); k < K; ++k){
 	g[k] = C * v[k];

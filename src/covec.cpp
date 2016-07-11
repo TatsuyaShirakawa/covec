@@ -238,8 +238,8 @@ namespace{
       "--neg_size, -N NEGSIZE=1                : the size of negative sampling\n"
       "--num_threads, -T NUM_THREADS=8         : the number of threads\n"
       "--sigma, -s SIGMA=0.1                   : initialize each element of vector with Normal(0, SIGMA)\n"
-      "--eta0, -e ETA0=0.005                   : initial learning rate for SGD\n"
-      "--eta1, -E ETA1=0.005                   : final learning rate for SGD\n"
+      "--eta0, -e ETA0=0.05                    : initial learning rate for SGD\n"
+      "--eta1, -E ETA1=0.00001                 : final learning rate for SGD\n"
       "--input_file, -i INPUT_FILE             : input file. supposed that each line is separated by SEP\n"
       "--output_prefix, -o OUTPUT_PREFIX=\"vec\" : output file prefix\n"
       "--sep, -S SEP='" "\t" "'                       : separator of each line in INPUT_FILE\n"
@@ -281,7 +281,7 @@ namespace{
       }else if( match(argv[i], "--eta1", "-E") ){
 	double x = std::stod(argv[++i]);
 	REQUIRED_POSITIVE(x, "eta1");
-	result.eta0 = static_cast<Real>(x);
+	result.eta1 = static_cast<Real>(x);
       }else if( match(argv[i], "--input_file", "-i") ){
 	input_file_found = true;
 	std::string x = argv[++i];
