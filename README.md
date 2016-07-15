@@ -10,10 +10,7 @@ where < u,v,...,w > is a higher order inner product of same dimensional vectors 
 
 ## requirements
 
-- compilers which support c++11
-  - culang
-  - gcc
-  - msvc
+- compilers which support c++11 (e.g. clang, gcc, msvc)
 
 ## build
 
