@@ -391,7 +391,7 @@ namespace{
     				   j_grad( 0, std::vector<Real>(cv.dimension()) )
     				   )
     	    ); // data_idx -> order -> entry -> dim -> value
-
+    
     assert( grads[0].size() == cv.order() );
     for(std::size_t m = 0; m < M; m += batch_size){
       auto cur_beg = beg + m;
@@ -512,31 +512,33 @@ int main(int narg, const char** argv)
       for(std::size_t n=0; n < num_threads; ++n){
 	threads[n].join();
       }
-
+      
       cum_count += count;
       
       // report
       auto tack = std::chrono::system_clock::now();
       auto millisec = std::chrono::duration_cast<std::chrono::milliseconds>(tack - tick).count();
       double percent = (cum_count * 100.0) / (data.size() * num_epochs);
-      std::size_t words_per_sec = (1000*count) / millisec;
-      std::cout << "\r"
-		<< "epoch " << std::right << std::setw(3) << epoch+1 << "/" << num_epochs
-		<< "  " << std::left << std::setw(5) << std::fixed << std::setprecision(2) << percent << " %"
-		<< "  " << std::left << std::setw(6) << words_per_sec << " words/sec."
-		<< std::flush;
-      tick = std::chrono::system_clock::now();
-
+      if(millisec>0){
+	std::size_t words_per_sec = (millisec != 0)? (1000*count) / millisec : std::numeric_limits<std::size_t>::max();
+	std::cout << "\r"
+		  << "epoch " << std::right << std::setw(3) << epoch+1 << "/" << num_epochs
+		  << "  " << std::left << std::setw(5) << std::fixed << std::setprecision(2) << percent << " %"
+		  << "  " << std::left << std::setw(6) << words_per_sec << " words/sec."
+		  << std::flush;
+	tick = std::chrono::system_clock::now();
+      }
     }
   }
 
   auto tack = std::chrono::system_clock::now();
   auto millisec = std::chrono::duration_cast<std::chrono::milliseconds>(tack - start).count();
-  std::size_t words_per_sec = (1000 * data.size() * num_epochs) / millisec;
-  std::cout << "\r" << "average: " 
-	    << std::left << std::setw(6)
-	    << words_per_sec << " words/sec." << std::endl;
-
+  if(millisec > 0){
+    std::size_t words_per_sec = (1000 * data.size() * num_epochs) / millisec;
+    std::cout << "\r" << "average: " 
+	      << std::left << std::setw(6)
+	      << words_per_sec << " words/sec." << std::endl;
+  }
   std::cout << std::endl;
   std::cout << "saving..." << std::endl;
   save(output_prefix, cv, codebooks);
