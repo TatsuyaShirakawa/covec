@@ -23,13 +23,13 @@ inline bool match(const std::string& s, const std::string& arg)
 { return std::string(s) == arg; }
 
 
-#define REQUIRED_POSITIVE(x, name)					\
-  if(x <= 0){								\
-    if( x <= 0 ){							\
+#define REQUIRED_POSITIVE(x, name)                                      \
+  if(x <= 0){                                                           \
+    if( x <= 0 ){                                                       \
       std::cerr << name " must be > 0 but given: " << x << std::endl;	\
-      exit(1);								\
-    }									\
-  }									\
+      exit(1);                                                          \
+    }                                                                   \
+  }                                                                     \
 
 
 namespace{
@@ -42,11 +42,11 @@ namespace{
     {
       auto itr = this->entry2codes_.find(x);
       if(itr == this->entry2codes_.end()){
-	auto entried = this->entry2codes_.insert
-	  (std::make_pair(x, code2entries_.size()));
-	itr = entried.first;
-	this->code2entries_.push_back(x);
-	this->counts_.push_back(0.0);
+        auto entried = this->entry2codes_.insert
+          (std::make_pair(x, code2entries_.size()));
+        itr = entried.first;
+        this->code2entries_.push_back(x);
+        this->counts_.push_back(0.0);
       }
       this->counts_[itr->second] += 1;
       return itr->second;
@@ -76,18 +76,18 @@ namespace{
       std::unordered_map<std::string, std::size_t> new_entry2codes;
 
       for(std::size_t i = 0, I = this->counts_.size(); i < I; ++i){
-	count_and_inds[i] = std::make_pair(this->counts_[i], i );
+        count_and_inds[i] = std::make_pair(this->counts_[i], i );
       }
 
       std::sort(count_and_inds.begin(), count_and_inds.end()
-		, std::greater<std::pair<double, std::size_t> >());
+                , std::greater<std::pair<double, std::size_t> >());
       for(std::size_t i = 0, I = count_and_inds.size(); i < I; ++i){
-	double count = count_and_inds[i].first;
-	std::size_t ind = count_and_inds[i].second;
-	const std::string& entry = this->code2entries_[ind];
-	new_counts[i] = count;
-	new_code2entries[i] = entry;
-	new_entry2codes.insert(std::make_pair(entry, i));
+        double count = count_and_inds[i].first;
+        std::size_t ind = count_and_inds[i].second;
+        const std::string& entry = this->code2entries_[ind];
+        new_counts[i] = count;
+        new_code2entries[i] = entry;
+        new_entry2codes.insert(std::make_pair(entry, i));
       }
       this->counts_ = new_counts;
       this->code2entries_ = new_code2entries;
@@ -102,21 +102,21 @@ namespace{
 
 
   bool load(std::vector<std::shared_ptr<CodeBook> >& codebooks,
-	    std::vector<std::vector<std::size_t> >& data,
-	    const std::string& input_file,
-	    const std::size_t order,
-	    const char sep,
-	    bool sort_enabled,
-	    bool shared_enabled
-	    )
+            std::vector<std::vector<std::size_t> >& data,
+            const std::string& input_file,
+            const std::size_t order,
+            const char sep,
+            bool sort_enabled,
+            bool shared_enabled
+            )
   {
     codebooks.clear();
     codebooks.resize(order);
     for(std::size_t i = 0; i < order; ++i){
       if(shared_enabled && i > 0){
-	codebooks[i] = codebooks[0];
+        codebooks[i] = codebooks[0];
       }else{
-	codebooks[i] = std::make_shared<CodeBook>();
+        codebooks[i] = std::make_shared<CodeBook>();
       }
     }
 
@@ -134,25 +134,25 @@ namespace{
       std::vector<std::size_t> instance(order);
       std::size_t i=0;
       do{
-	pos_to = line.find_first_of(sep, pos_from);
-	std::size_t code = codebooks[i]->entry(line.substr(pos_from, pos_to-pos_from));
-	instance[i] = code;
-	if(pos_to == std::string::npos){
-	  pos_from = std::string::npos;
-	}else{
-	  pos_from = pos_to + 1;
-	}
-	++i;
-	if(i > order){
-	  std::cerr << "too many entries in a line: " << line << std::endl;
-	  exit(1);
-	}
+        pos_to = line.find_first_of(sep, pos_from);
+        std::size_t code = codebooks[i]->entry(line.substr(pos_from, pos_to-pos_from));
+        instance[i] = code;
+        if(pos_to == std::string::npos){
+          pos_from = std::string::npos;
+        }else{
+          pos_from = pos_to + 1;
+        }
+        ++i;
+        if(i > order){
+          std::cerr << "too many entries in a line: " << line << std::endl;
+          exit(1);
+        }
       }while(pos_from != std::string::npos);
       if(i < order){
-	if(i > order){
-	  std::cerr << "too few entries in a line: " << line << std::endl;
-	  exit(1);
-	}
+        if(i > order){
+          std::cerr << "too few entries in a line: " << line << std::endl;
+          exit(1);
+        }
       }
       if(!sort_enabled){ data.push_back(instance); }
     }
@@ -162,9 +162,9 @@ namespace{
       // renew encodings so that they are sorted by descending order of frequency
       std::cout << "reindex..." << std::endl;
       for(std::size_t i = 0; i < order; ++i){
-	if(i == 0 || !shared_enabled){
-	  codebooks[i]->reindex();
-	}
+        if(i == 0 || !shared_enabled){
+          codebooks[i]->reindex();
+        }
       }
 
       // create data
@@ -173,22 +173,22 @@ namespace{
       data.resize(data.size() + n_data);
       fin.clear(); fin.seekg(0, std::ios_base::beg);
       while(std::getline(fin, line)){
-	std::size_t pos_from = 0, pos_to = 0;
-	std::vector<std::size_t> instance(order);
-	std::size_t i=0;
-	do{
-	  pos_to = line.find_first_of(sep, pos_from);
-	  std::size_t code = codebooks[i]->encode(line.substr(pos_from, pos_to-pos_from));
-	  instance[i] = code;
-	  if(pos_to == std::string::npos){
-	    pos_from = std::string::npos;
-	  }else{
-	    pos_from = pos_to + 1;
-	  }
-	  ++i;
-	}while(pos_from != std::string::npos);
-	data[data_idx] = instance;
-	++data_idx;
+        std::size_t pos_from = 0, pos_to = 0;
+        std::vector<std::size_t> instance(order);
+        std::size_t i=0;
+        do{
+          pos_to = line.find_first_of(sep, pos_from);
+          std::size_t code = codebooks[i]->encode(line.substr(pos_from, pos_to-pos_from));
+          instance[i] = code;
+          if(pos_to == std::string::npos){
+            pos_from = std::string::npos;
+          }else{
+            pos_from = pos_to + 1;
+          }
+          ++i;
+        }while(pos_from != std::string::npos);
+        data[data_idx] = instance;
+        ++data_idx;
       }
     }      
 
@@ -238,7 +238,7 @@ namespace{
       "--neg_size, -N NEGSIZE=1                : the size of negative sampling\n"
       "--num_threads, -T NUM_THREADS=8         : the number of threads\n"
       "--sigma, -s SIGMA=0.1                   : initialize each element of vector with Normal(0, SIGMA)\n"
-      "--eta0, -e ETA0=0.05                    : initial learning rate for SGD\n"
+      "--eta0, -e ETA0=0.005                   : initial learning rate for SGD\n"
       "--eta1, -E ETA1=0.00001                 : final learning rate for SGD\n"
       "--input_file, -i INPUT_FILE             : input file. supposed that each line is separated by SEP\n"
       "--output_prefix, -o OUTPUT_PREFIX=\"vec\" : output file prefix\n"
@@ -251,67 +251,67 @@ namespace{
     bool input_file_found = false;
     for(int i=1; i<narg; ++i){
       if( match(argv[i], "--dim", "-d") ){
-	int x = std::stoi(argv[++i]);
-	REQUIRED_POSITIVE(x, "dim");
-	result.dim = static_cast<std::size_t>(x);
+        int x = std::stoi(argv[++i]);
+        REQUIRED_POSITIVE(x, "dim");
+        result.dim = static_cast<std::size_t>(x);
       }else if( match(argv[i], "--batch_size", "-b") ){
-	int x = std::stoi(argv[++i]);
-	REQUIRED_POSITIVE(x, "batch_size");
-	result.batch_size = static_cast<std::size_t>(x);
+        int x = std::stoi(argv[++i]);
+        REQUIRED_POSITIVE(x, "batch_size");
+        result.batch_size = static_cast<std::size_t>(x);
       }else if( match(argv[i], "--num_epochs", "-n") ){
-	int x = std::stoi(argv[++i]);
-	REQUIRED_POSITIVE(x, "num_epochs");
-	result.num_epochs = static_cast<std::size_t>(x);
+        int x = std::stoi(argv[++i]);
+        REQUIRED_POSITIVE(x, "num_epochs");
+        result.num_epochs = static_cast<std::size_t>(x);
       }else if( match(argv[i], "--neg_size", "-N") ){
-	int x = std::stoi(argv[++i]);
-	REQUIRED_POSITIVE(x, "neg_size");
-	result.neg_size = static_cast<std::size_t>(x);
+        int x = std::stoi(argv[++i]);
+        REQUIRED_POSITIVE(x, "neg_size");
+        result.neg_size = static_cast<std::size_t>(x);
       }else if( match(argv[i], "--num_threads", "-T") ){
-	int x = std::stoi(argv[++i]);
-	REQUIRED_POSITIVE(x, "num_threads");
-	result.num_threads = static_cast<std::size_t>(x);
+        int x = std::stoi(argv[++i]);
+        REQUIRED_POSITIVE(x, "num_threads");
+        result.num_threads = static_cast<std::size_t>(x);
       }else if( match(argv[i], "--sigma", "-s") ){
-	double x = std::stod(argv[++i]);
-	REQUIRED_POSITIVE(x, "sigma");
-	result.sigma = static_cast<Real>(x);
+        double x = std::stod(argv[++i]);
+        REQUIRED_POSITIVE(x, "sigma");
+        result.sigma = static_cast<Real>(x);
       }else if( match(argv[i], "--eta0", "-e") ){
-	double x = std::stod(argv[++i]);
-	REQUIRED_POSITIVE(x, "eta0");
-	result.eta0 = static_cast<Real>(x);
+        double x = std::stod(argv[++i]);
+        REQUIRED_POSITIVE(x, "eta0");
+        result.eta0 = static_cast<Real>(x);
       }else if( match(argv[i], "--eta1", "-E") ){
-	double x = std::stod(argv[++i]);
-	REQUIRED_POSITIVE(x, "eta1");
-	result.eta1 = static_cast<Real>(x);
+        double x = std::stod(argv[++i]);
+        REQUIRED_POSITIVE(x, "eta1");
+        result.eta1 = static_cast<Real>(x);
       }else if( match(argv[i], "--input_file", "-i") ){
-	input_file_found = true;
-	std::string x = argv[++i];
-	result.input_file = x;
+        input_file_found = true;
+        std::string x = argv[++i];
+        result.input_file = x;
       }else if( match(argv[i], "--sep", "-S") ){
-	std::string x = argv[++i];
-	if(x == "\\t"){
-	  result.sep = '\t';
-	}else if(x == "\\s"){
-	  result.sep = ' ';
-	}else{
-	  if( x.length() != 1 ){
-	    std::cerr << "sep must be a character but given : " << x << std::endl;
-	    exit(1);
-	  }
-	  result.sep = x[0];
-	}
+        std::string x = argv[++i];
+        if(x == "\\t"){
+          result.sep = '\t';
+        }else if(x == "\\s"){
+          result.sep = ' ';
+        }else{
+          if( x.length() != 1 ){
+            std::cerr << "sep must be a character but given : " << x << std::endl;
+            exit(1);
+          }
+          result.sep = x[0];
+        }
       }else if( match(argv[i], "--shuffle") ){
-	result.shuffle_enabled = true;
+        result.shuffle_enabled = true;
       }else if( match(argv[i], "--sort") ){
-	result.sort_enabled = true;
+        result.sort_enabled = true;
       }else if( match(argv[i], "--shared") ){
-	result.shared_enabled = true;
+        result.shared_enabled = true;
       }else if( match(argv[i], "--help", "-h") ){
-	std::cout << help_message << std::endl;
-	exit(0);
+        std::cout << help_message << std::endl;
+        exit(0);
       }else{
-	std::cerr << "invalid argument: " << argv[i] << std::endl;
-	std::cerr << help_message << std::endl;
-	exit(1);
+        std::cerr << "invalid argument: " << argv[i] << std::endl;
+        std::cerr << help_message << std::endl;
+        exit(1);
       }
     }
 
@@ -358,19 +358,19 @@ namespace{
 
       std::ofstream fout(output_file.c_str());
       if(!fout || !fout.good()){
-	std::cerr << "cannot open output_vector_file: " << output_file << std::endl;
-	exit(1);
+        std::cerr << "cannot open output_vector_file: " << output_file << std::endl;
+        exit(1);
       }
 
       const auto& vs_i = *vs[i];
       const auto& codebooks_i = *codebooks[i];
       for(std::size_t j = 0, J = vs_i.size(); j < J; ++j){
-	const auto& vs_ij = vs_i[j];
-	fout << codebooks_i.decode(j);
-	for(std::size_t k = 0, K = vs_ij.size(); k < K; ++k){
-	  fout << "\t" << vs_ij[k];
-	}
-	fout << "\n";
+        const auto& vs_ij = vs_i[j];
+        fout << codebooks_i.decode(j);
+        for(std::size_t k = 0, K = vs_ij.size(); k < K; ++k){
+          fout << "\t" << vs_ij[k];
+        }
+        fout << "\n";
       }
     }
 
@@ -379,8 +379,8 @@ namespace{
 
   template <class Real, class InputIterator, class RandomGenerator>
     void run_thread(Covec<Real>& cv, InputIterator beg, InputIterator end,
-		    const std::size_t batch_size,
-		    RandomGenerator& gen)
+                    const std::size_t batch_size,
+                    RandomGenerator& gen)
   {
     std::size_t M = static_cast<std::size_t>(std::distance(beg, end));
     
@@ -388,8 +388,8 @@ namespace{
     std::vector< std::vector< j_grad > >
       grads(batch_size * (1 + cv.neg_size()),
     	    std::vector< j_grad >( cv.order(),
-    				   j_grad( 0, std::vector<Real>(cv.dimension()) )
-    				   )
+                                   j_grad( 0, std::vector<Real>(cv.dimension()) )
+                                   )
     	    ); // data_idx -> order -> entry -> dim -> value
     
     assert( grads[0].size() == cv.order() );
@@ -460,8 +460,8 @@ int main(int narg, const char** argv)
       probs.push_back(probs[0]);
     }else{
       probs.push_back( std::make_shared<std::discrete_distribution<int> >
-		       (codebooks[i]->counts().begin(), codebooks[i]->counts().end())
-		       );
+                       (codebooks[i]->counts().begin(), codebooks[i]->counts().end())
+                       );
     }
   }
   
@@ -485,32 +485,32 @@ int main(int narg, const char** argv)
       // multi thread update
       std::vector<std::thread> threads(num_threads);
       for(std::size_t n=0; n < num_threads; ++n){
-	if(n + 1 < num_threads){
-	  threads[n] = std::thread(&::run_thread<Real,
-				   std::vector<std::vector<std::size_t> >::const_iterator,
-				   std::mt19937
-				   >,
-				   std::ref(cv),
-				   data.cbegin() + m + n * step,
-				   data.cbegin() + m + (n+1) * step,
-				   batch_size,
-				   std::ref(gen));
-	  assert( m + (n+1) * step <= data.size() );
-	}else{
-	  threads[n] = std::thread(&::run_thread<Real,
-				   std::vector<std::vector<std::size_t> >::const_iterator,
-				   std::mt19937
-				   >,
-				   std::ref(cv),
-				   data.cbegin() + m + n * step,
-				   data.cbegin() + m + count,
-				   batch_size,
-				   std::ref(gen));
-	  assert( std::min(m + every_count, data.size()) <= data.size() );	  
-	}
+        if(n + 1 < num_threads){
+          threads[n] = std::thread(&::run_thread<Real,
+                                   std::vector<std::vector<std::size_t> >::const_iterator,
+                                   std::mt19937
+                                   >,
+                                   std::ref(cv),
+                                   data.cbegin() + m + n * step,
+                                   data.cbegin() + m + (n+1) * step,
+                                   batch_size,
+                                   std::ref(gen));
+          assert( m + (n+1) * step <= data.size() );
+        }else{
+          threads[n] = std::thread(&::run_thread<Real,
+                                   std::vector<std::vector<std::size_t> >::const_iterator,
+                                   std::mt19937
+                                   >,
+                                   std::ref(cv),
+                                   data.cbegin() + m + n * step,
+                                   data.cbegin() + m + count,
+                                   batch_size,
+                                   std::ref(gen));
+          assert( std::min(m + every_count, data.size()) <= data.size() );	  
+        }
       }
       for(std::size_t n=0; n < num_threads; ++n){
-	threads[n].join();
+        threads[n].join();
       }
       
       cum_count += count;
@@ -520,13 +520,13 @@ int main(int narg, const char** argv)
       auto millisec = std::chrono::duration_cast<std::chrono::milliseconds>(tack - tick).count();
       double percent = (cum_count * 100.0) / (data.size() * num_epochs);
       if(millisec>0){
-	std::size_t words_per_sec = (millisec != 0)? (1000*count) / millisec : std::numeric_limits<std::size_t>::max();
-	std::cout << "\r"
-		  << "epoch " << std::right << std::setw(3) << epoch+1 << "/" << num_epochs
-		  << "  " << std::left << std::setw(5) << std::fixed << std::setprecision(2) << percent << " %"
-		  << "  " << std::left << std::setw(6) << words_per_sec << " words/sec."
-		  << std::flush;
-	tick = std::chrono::system_clock::now();
+        std::size_t words_per_sec = (millisec != 0)? (1000*count) / millisec : std::numeric_limits<std::size_t>::max();
+        std::cout << "\r"
+                  << "epoch " << std::right << std::setw(3) << epoch+1 << "/" << num_epochs
+                  << "  " << std::left << std::setw(5) << std::fixed << std::setprecision(2) << percent << " %"
+                  << "  " << std::left << std::setw(6) << words_per_sec << " words/sec."
+                  << std::flush;
+        tick = std::chrono::system_clock::now();
       }
     }
   }
@@ -536,8 +536,8 @@ int main(int narg, const char** argv)
   if(millisec > 0){
     std::size_t words_per_sec = (1000 * data.size() * num_epochs) / millisec;
     std::cout << "\r" << "average: " 
-	      << std::left << std::setw(6)
-	      << words_per_sec << " words/sec." << std::endl;
+              << std::left << std::setw(6)
+              << words_per_sec << " words/sec." << std::endl;
   }
   std::cout << std::endl;
   std::cout << "saving..." << std::endl;

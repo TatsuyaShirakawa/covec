@@ -50,7 +50,7 @@ Options and arguments:
 --num_threads, -T NUM_THREADS=8         : the number of threads
 --sigma, -s SIGMA=0.1                   : initialize each element of vector with Normal(0, SIGMA)
 --eta0, -e ETA0=0.005                   : initial learning rate for SGD
---eta1, -E ETA1=0.005                   : final learning rate for SGD
+--eta1, -E ETA1=0.00001                 : final learning rate for SGD
 --input_file, -i INPUT_FILE             : input file. supposed that each line is separated by SEP
 --output_prefix, -o OUTPUT_PREFIX="vec" : output file prefix
 --sep, -S SEP='	'                       : separator of each line in INPUT_FILE
