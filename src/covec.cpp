@@ -107,14 +107,29 @@ namespace{
             const std::size_t order,
             const char sep,
             bool sort_enabled,
-            bool shared_enabled
+            const std::vector<std::size_t>& share
             )
   {
     codebooks.clear();
     codebooks.resize(order);
+
+    std::vector<bool> first_of_sharings;
+    {
+      std::size_t count=0;
+      for(std::size_t i = 0; i < order; ++i){
+        if(share.empty() || share[i] == count){
+          first_of_sharings.push_back(true);
+          ++count;        
+        }else{
+          first_of_sharings.push_back(false);
+
+        }
+      }
+    }
+    
     for(std::size_t i = 0; i < order; ++i){
-      if(shared_enabled && i > 0){
-        codebooks[i] = codebooks[0];
+      if(!first_of_sharings[i]){
+        codebooks[i] = codebooks[share[i]];
       }else{
         codebooks[i] = std::make_shared<CodeBook>();
       }
@@ -125,7 +140,7 @@ namespace{
       std::cerr << "cannot open file: " << input_file << std::endl;
       return false;
     }
-
+    
     std::string line;
     std::size_t n_data = 0;
     while(std::getline(fin, line)){
@@ -162,7 +177,7 @@ namespace{
       // renew encodings so that they are sorted by descending order of frequency
       std::cout << "reindex..." << std::endl;
       for(std::size_t i = 0; i < order; ++i){
-        if(i == 0 || !shared_enabled){
+        if(first_of_sharings[i]){
           codebooks[i]->reindex();
         }
       }
@@ -191,7 +206,6 @@ namespace{
         ++data_idx;
       }
     }      
-
     
     return true;
   }
@@ -204,8 +218,8 @@ namespace{
       , sigma(static_cast<Real>(1.0e-1))
       , eta0(static_cast<Real>(5e-3))
       , eta1(static_cast<Real>(1e-5))
-      , input_file(), output_prefix("result"), sep('\t')
-      , shuffle_enabled(false), sort_enabled(false), shared_enabled(false)
+      , input_file(), output_prefix("result"), sep('\t'), share_str()
+      , shuffle_enabled(false), sort_enabled(false)
     {}
 
     std::size_t order;
@@ -220,10 +234,36 @@ namespace{
     std::string input_file;
     std::string output_prefix;
     char sep;
+    std::string share_str;
     bool shuffle_enabled;
     bool sort_enabled;
-    bool shared_enabled;
+
   }; // end of Config
+
+  /**
+   * parse string like "0,1,0" into [0, 1, 0]
+   **/
+  std::vector<std::size_t> parse_share_str(const std::string& share_str)
+  {
+    std::vector<std::size_t> result;
+    std::size_t counter=0;
+    for(std::size_t i=0; i<share_str.length(); ++i){
+      std::size_t j = share_str.find_first_of(',', i);
+      std::size_t k = static_cast<std::size_t>(std::stoi(share_str.substr(i, j-i)));
+      if(k > counter){
+        std::cerr << "invalid share string (share string should be 0, 1, 2, ... in this order): " << share_str << std::endl;
+        exit(1);
+      }
+      if(k >= counter){
+        ++counter;
+      }
+      result.push_back(k);
+      i = j;
+      if(i == std::string::npos){ break; }
+    }
+    return result;
+  }
+
 
   Config parse_args(int narg, const char** argv)
   {
@@ -246,7 +286,7 @@ namespace{
       "--help, -h                              : show this help message\n"
       "--shuffle                               : enuable the switch to shuffle data before every epoch\n"
       "--sort                                  : sort entries by descending order of frequency\n"
-      "--shared                                : vectors of each order are shared"
+      "--share INDICES                         : set this option to share parameter through different orders. if \"0,1,0\" is set, order 0 and 2 share parameters."
       ;
     bool input_file_found = false;
     for(int i=1; i<narg; ++i){
@@ -303,8 +343,9 @@ namespace{
         result.shuffle_enabled = true;
       }else if( match(argv[i], "--sort") ){
         result.sort_enabled = true;
-      }else if( match(argv[i], "--shared") ){
-        result.shared_enabled = true;
+      }else if( match(argv[i], "--share") ){
+        std::string x = argv[++i];
+        result.share_str = x;
       }else if( match(argv[i], "--help", "-h") ){
         std::cout << help_message << std::endl;
         exit(0);
@@ -418,10 +459,11 @@ int main(int narg, const char** argv)
   const std::string input_file = config.input_file;
   const std::string output_prefix = config.output_prefix;
   const char sep = config.sep;
+  const std::string share_str = config.share_str;
+  const std::vector<std::size_t> share = parse_share_str(share_str);
   const std::size_t order = detect_order(input_file, sep);
   const bool shuffle_enabled = config.shuffle_enabled;
   const bool sort_enabled = config.sort_enabled;
-  const bool shared_enabled = config.shared_enabled;
 
   std::cout << "config:" << std::endl;
   std::cout << "  " <<  "dim          : " << dim << std::endl;
@@ -435,18 +477,25 @@ int main(int narg, const char** argv)
   std::cout << "  " <<  "input_file   : " << input_file << std::endl;
   std::cout << "  " <<  "output_vector_file  : " << output_prefix + ".<#>.tsv" << std::endl;
   std::cout << "  " <<  "sep          : " << "\"" << sep << "\"" << std::endl;
+  
+  std::cout << "  " <<  "share        : ";
+  for(int i = 0; i < share.size(); ++i){
+    if(i > 0){
+      std::cout << ",";
+    }
+    std::cout << share[i];
+  }
+  std::cout << std::endl;
+  
   std::cout << "  " <<  "order        : " << order << std::endl;
   std::cout << "  " <<  "shuffle      : " << std::boolalpha << shuffle_enabled << std::endl;
   std::cout << "  " <<  "sort         : " << std::boolalpha << sort_enabled << std::endl;
-  std::cout << "  " <<  "shared       : " << std::boolalpha << shared_enabled << std::endl;  
 
   std::vector<std::shared_ptr<CodeBook> > codebooks;
   std::vector<std::vector<std::size_t> > data;
   std::mt19937 gen(0);
   std::cout << "loading " << input_file << "..." << std::endl;;
-  load(codebooks, data, input_file, order, sep, sort_enabled, shared_enabled);
-  std::cout << data.size() << std::endl;
-
+  load(codebooks, data, input_file, order, sep, sort_enabled, share);
   std::cout << "data size: " << data.size() << std::endl;
   std::cout << "codebook sizes:" << std::endl;
   for(std::size_t i=0; i<order; ++i){
@@ -455,9 +504,21 @@ int main(int narg, const char** argv)
 
   std::cout << "creating distributions..." << std::endl;
   std::vector<std::shared_ptr<std::discrete_distribution<int> > > probs;
+
+  std::vector<bool> first_of_sharings;
+  std::size_t counter=0;
   for(std::size_t i=0; i < codebooks.size(); ++i){
-    if(shared_enabled && i > 0){
-      probs.push_back(probs[0]);
+    if(share.empty() || share[i] == counter){
+      first_of_sharings.push_back(true);
+      ++counter;      
+    }else{
+      first_of_sharings.push_back(false);
+    }
+  }
+  
+  for(std::size_t i=0; i < codebooks.size(); ++i){
+    if(!first_of_sharings[i]){
+      probs.push_back(probs[share[i]]);
     }else{
       probs.push_back( std::make_shared<std::discrete_distribution<int> >
                        (codebooks[i]->counts().begin(), codebooks[i]->counts().end())
@@ -466,7 +527,7 @@ int main(int narg, const char** argv)
   }
   
   std::cout << "creating covec..." << std::endl;
-  Covec<Real> cv(probs, gen, dim, sigma, neg_size, eta0, eta1, shared_enabled);
+  Covec<Real> cv(probs, gen, dim, sigma, neg_size, eta0, eta1, share);
 
   std::cout << "start training..." << std::endl;
   std::size_t cum_count = 0, every_count = 1000000;

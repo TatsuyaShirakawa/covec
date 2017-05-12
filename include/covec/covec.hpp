@@ -25,17 +25,17 @@ namespace covec{
           const std::size_t neg_size = 1,
           const Real eta0 = 5e-3, // initial learning rate
           const Real eta1 = 1e-5,  // final learning rate
-          const bool shared = false // if true vectors of each order are shared
+          const std::vector<std::size_t>& share = std::vector<std::size_t>() // put indices to share parameters
           )
       : num_entries_(), dim_(), neg_size_(), eta0_(), eta1_()
-      , vs_(), cs_(), shared_()
+      , vs_(), cs_(), share_()
     {
       std::vector<std::shared_ptr<std::discrete_distribution<int> > > probs;
       for(const auto& counts : each_counts){
         auto prob = std::make_shared<std::discrete_distribution<int> >(counts.begin(), counts.end());
         probs.push_back(prob);
       }
-      this->initialize(probs, gen, dim, sigma, neg_size, eta0, eta1, shared);
+      this->initialize(probs, gen, dim, sigma, neg_size, eta0, eta1, share);
     }
 
     template <class InputIterator, class RandomGenerator>
@@ -46,10 +46,10 @@ namespace covec{
           const std::size_t neg_size = 1,
           const Real eta0 = 5e-3, // learning rate
           const Real eta1 = 1e-5, // final learning rate
-          bool shared = false // if true vectors of each order are shared	  
+          const std::vector<std::size_t>& share = std::vector<std::size_t>() // put indices to share parameters
           )
       : num_entries_(), dim_(), neg_size_(), eta0_(), eta1_()
-      , vs_(), cs_(), shared_()
+      , vs_(), cs_(), share_()
     {
       std::vector<std::shared_ptr<std::discrete_distribution<int> > > probs;
       for(const auto&& beg_and_end : begs_and_ends){
@@ -57,7 +57,7 @@ namespace covec{
         auto prob = std::make_shared<std::discrete_distribution<int> >(beg, end);
         probs.push_back(prob);
       }
-      this->initialize(probs, gen, dim, sigma, neg_size, eta0, eta1, shared);
+      this->initialize(probs, gen, dim, sigma, neg_size, eta0, eta1, share);
     }
 
     template <class RandomGenerator>
@@ -68,11 +68,12 @@ namespace covec{
           const std::size_t neg_size = 1,
           const Real eta0 = 5e-3, // learning rate
           const Real eta1 = 1e-5, // final learning rate
-          bool shared = false // if true vectors of each order are shared	  
+          const std::vector<std::size_t>& share = std::vector<std::size_t>() // put indices to share parameters          
           )
       : num_entries_(), dim_(), neg_size_(), eta0_()
-      , vs_(), cs_(), shared_()
-    { this->initialize(probs, gen, dim, sigma, neg_size, eta0, eta1, shared); }
+      , vs_(), cs_(), share_()
+    { this->initialize(probs, gen, dim, sigma, neg_size, eta0, eta1, share); }
+     
 
   public:
 
@@ -106,8 +107,8 @@ namespace covec{
     inline const Real eta1() const
     { return this->eta1_; }
 
-    inline bool shared() const
-    { return this->shared_; }
+    inline const std::vector<std::size_t>& share() const
+    { return this->share_; }
 
   private:
 
@@ -119,7 +120,7 @@ namespace covec{
                     const std::size_t neg_size = 1,
                     const Real eta0 = 5e-3,
                     const Real eta1 = 1e-5,
-                    bool shared = false // if true vectors of each order are shared		    
+                    const std::vector<std::size_t>& share = std::vector<std::size_t>() // put indices to share parameters
                     );
 
     typedef enum { POSITIVE, NEGATIVE } POS_NEG;
@@ -157,7 +158,7 @@ namespace covec{
     //    std::vector<std::vector<std::vector<Real> > > vs_; // order -> entry -> dim -> value
     std::vector<std::shared_ptr<std::vector<std::vector<Real> > > > vs_; // order -> entry -> dim -> value    
     std::vector<std::shared_ptr<std::vector<std::size_t> > > cs_; // counts of occurrencees
-    bool shared_;
+    std::vector<std::size_t> share_;
   }; // end of Covectorizer
 
   // -------------------------------------------------------------------------------
@@ -171,7 +172,7 @@ namespace covec{
                                const std::size_t neg_size,
                                const Real eta0,
                                const Real eta1,
-                               const bool shared
+                               const std::vector<std::size_t>& share
                                )
   {
     this->probs_ = probs;
@@ -179,11 +180,24 @@ namespace covec{
     this->neg_size_ = neg_size;
     this->eta0_ = eta0;
     this->eta1_ = eta1;
-    this->shared_ = shared;
-    
+    this->share_ = share;
+
     this->num_entries_.clear();
     this->vs_.clear();
     this->cs_.clear();
+
+    std::vector<bool> first_of_sharings;
+    {
+      std::size_t counter=0;
+      for(std::size_t i=0; i < probs.size(); ++i){
+        if(share.empty() || share[i] == counter){
+          first_of_sharings.push_back(true);
+          ++counter;
+        }else{
+          first_of_sharings.push_back(false);
+        }
+      }
+    }
 
     std::size_t order = this->probs_.size();
     this->vs_.resize(order);
@@ -191,11 +205,11 @@ namespace covec{
     this->num_entries_.resize(order);
     std::normal_distribution<Real> normal(0.0, sigma);
     for(std::size_t i = 0; i < order; ++i){
-      if(this->shared() && i > 0){
-        assert(this->probs_[i] == this->probs_[0]);
-        this->vs_[i] = this->vs_[0];
-        this->num_entries_[i] = this->num_entries_[0];
-        this->cs_[i] = this->cs_[0];
+      if(!first_of_sharings[i]){
+        assert(this->probs_[i] == this->probs_[this->share_[i]]);
+        this->vs_[i] = this->vs_[this->share_[i]];
+        this->num_entries_[i] = this->num_entries_[this->share_[i]];
+        this->cs_[i] = this->cs_[this->share_[i]];
       }else{
         const auto& prob = this->probs_[i];
 
