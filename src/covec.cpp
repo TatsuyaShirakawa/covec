@@ -175,7 +175,7 @@ namespace{
     if(sort_enabled){
       
       // renew encodings so that they are sorted by descending order of frequency
-      std::cout << "reindex..." << std::endl;
+      std::cout << "reindex ..." << std::endl;
       for(std::size_t i = 0; i < order; ++i){
         if(first_of_sharings[i]){
           codebooks[i]->reindex();
@@ -183,7 +183,7 @@ namespace{
       }
 
       // create data
-      std::cout << "remake data..." << std::endl;      
+      std::cout << "remake data ..." << std::endl;      
       std::size_t data_idx = data.size();
       data.resize(data.size() + n_data);
       fin.clear(); fin.seekg(0, std::ios_base::beg);
@@ -407,7 +407,7 @@ namespace{
       const auto& codebooks_i = *codebooks[i];
       for(std::size_t j = 0, J = vs_i.size(); j < J; ++j){
         const auto& vs_ij = vs_i[j];
-        fout << codebooks_i.decode(j);
+        fout << codebooks_i.decode(j) << "\t" << codebooks_i.counts()[j];;
         for(std::size_t k = 0, K = vs_ij.size(); k < K; ++k){
           fout << "\t" << vs_ij[k];
         }
@@ -494,7 +494,7 @@ int main(int narg, const char** argv)
   std::vector<std::shared_ptr<CodeBook> > codebooks;
   std::vector<std::vector<std::size_t> > data;
   std::mt19937 gen(0);
-  std::cout << "loading " << input_file << "..." << std::endl;;
+  std::cout << "load " << input_file << " ..." << std::endl;;
   load(codebooks, data, input_file, order, sep, sort_enabled, share);
   std::cout << "data size: " << data.size() << std::endl;
   std::cout << "codebook sizes:" << std::endl;
@@ -502,7 +502,7 @@ int main(int narg, const char** argv)
     std::cout << "  " << i << ": " << codebooks[i]->size() << std::endl;
   }
 
-  std::cout << "creating distributions..." << std::endl;
+  std::cout << "creat distributions ..." << std::endl;
   std::vector<std::shared_ptr<std::discrete_distribution<int> > > probs;
 
   std::vector<bool> first_of_sharings;
@@ -526,10 +526,10 @@ int main(int narg, const char** argv)
     }
   }
   
-  std::cout << "creating covec..." << std::endl;
+  std::cout << "initialize covec ..." << std::endl;
   Covec<Real> cv(probs, gen, dim, sigma, neg_size, eta0, eta1, share);
 
-  std::cout << "start training..." << std::endl;
+  std::cout << "start training ..." << std::endl;
   std::size_t cum_count = 0, every_count = 1000000;
   auto tick = std::chrono::system_clock::now();
   auto start = tick;
@@ -601,7 +601,7 @@ int main(int narg, const char** argv)
               << words_per_sec << " words/sec." << std::endl;
   }
   std::cout << std::endl;
-  std::cout << "saving..." << std::endl;
+  std::cout << "save ..." << std::endl;
   save(output_prefix, cv, codebooks);
 
   return 0;
