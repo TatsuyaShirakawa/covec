@@ -326,6 +326,9 @@ namespace{
         input_file_found = true;
         std::string x = argv[++i];
         result.input_file = x;
+      }else if( match(argv[i], "--output_prefix", "-o") ){
+        std::string x = argv[++i];
+        result.output_prefix = x;
       }else if( match(argv[i], "--sep", "-S") ){
         std::string x = argv[++i];
         if(x == "\\t"){
