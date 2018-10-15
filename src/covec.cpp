@@ -218,6 +218,7 @@ namespace{
       , sigma(static_cast<Real>(1.0e-1))
       , eta0(static_cast<Real>(5e-3))
       , eta1(static_cast<Real>(1e-5))
+      , enable_chopout(false)
       , input_file(), output_prefix("result"), sep('\t'), share_str()
       , shuffle_enabled(false), sort_enabled(false)
     {}
@@ -231,6 +232,7 @@ namespace{
     Real sigma;
     Real eta0;
     Real eta1;
+    bool enable_chopout;
     std::string input_file;
     std::string output_prefix;
     char sep;
@@ -280,6 +282,7 @@ namespace{
       "--sigma, -s SIGMA=0.1                   : initialize each element of vector with Normal(0, SIGMA)\n"
       "--eta0, -e ETA0=0.005                   : initial learning rate for SGD\n"
       "--eta1, -E ETA1=0.00001                 : final learning rate for SGD\n"
+      "--enable_chopout                        : set this flag to enable chopout\n"
       "--input_file, -i INPUT_FILE             : input file. supposed that each line is separated by SEP\n"
       "--output_prefix, -o OUTPUT_PREFIX=\"vec\" : output file prefix\n"
       "--sep, -S SEP='" "\t" "'                       : separator of each line in INPUT_FILE\n"
@@ -322,6 +325,8 @@ namespace{
         double x = std::stod(argv[++i]);
         REQUIRED_POSITIVE(x, "eta1");
         result.eta1 = static_cast<Real>(x);
+      }else if( match(argv[i], "--enable_chopout") ){
+        result.enable_chopout = true;
       }else if( match(argv[i], "--input_file", "-i") ){
         input_file_found = true;
         std::string x = argv[++i];
@@ -459,6 +464,7 @@ int main(int narg, const char** argv)
   const Real sigma = config.sigma;
   const Real eta0 = config.eta0;
   const Real eta1 = config.eta1;
+  const bool enable_chopout = config.enable_chopout;
   const std::string input_file = config.input_file;
   const std::string output_prefix = config.output_prefix;
   const char sep = config.sep;
@@ -530,7 +536,7 @@ int main(int narg, const char** argv)
   }
   
   std::cout << "initialize covec ..." << std::endl;
-  Covec<Real> cv(probs, gen, dim, sigma, neg_size, eta0, eta1, share);
+  Covec<Real> cv(probs, gen, dim, sigma, neg_size, eta0, eta1, enable_chopout, share);
 
   std::cout << "start training ..." << std::endl;
   std::size_t cum_count = 0, every_count = 1000000;

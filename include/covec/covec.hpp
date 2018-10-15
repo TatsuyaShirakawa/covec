@@ -25,9 +25,10 @@ namespace covec{
           const std::size_t neg_size = 1,
           const Real eta0 = 5e-3, // initial learning rate
           const Real eta1 = 1e-5,  // final learning rate
+	  const bool enable_chopout = false,  // enable chopout or not
           const std::vector<std::size_t>& share = std::vector<std::size_t>() // put indices to share parameters
           )
-      : num_entries_(), dim_(), neg_size_(), eta0_(), eta1_()
+      : num_entries_(), dim_(), neg_size_(), eta0_(), eta1_(), chopout_enabled_(), keep_dim_()
       , vs_(), cs_(), share_()
     {
       std::vector<std::shared_ptr<std::discrete_distribution<int> > > probs;
@@ -35,7 +36,7 @@ namespace covec{
         auto prob = std::make_shared<std::discrete_distribution<int> >(counts.begin(), counts.end());
         probs.push_back(prob);
       }
-      this->initialize(probs, gen, dim, sigma, neg_size, eta0, eta1, share);
+      this->initialize(probs, gen, dim, sigma, neg_size, eta0, eta1, enable_chopout, share);
     }
 
     template <class InputIterator, class RandomGenerator>
@@ -46,9 +47,10 @@ namespace covec{
           const std::size_t neg_size = 1,
           const Real eta0 = 5e-3, // learning rate
           const Real eta1 = 1e-5, // final learning rate
+	  const bool enable_chopout = false,  // enable chopout or not
           const std::vector<std::size_t>& share = std::vector<std::size_t>() // put indices to share parameters
           )
-      : num_entries_(), dim_(), neg_size_(), eta0_(), eta1_()
+      : num_entries_(), dim_(), neg_size_(), eta0_(), eta1_(), chopout_enabled_(), keep_dim_()
       , vs_(), cs_(), share_()
     {
       std::vector<std::shared_ptr<std::discrete_distribution<int> > > probs;
@@ -57,7 +59,7 @@ namespace covec{
         auto prob = std::make_shared<std::discrete_distribution<int> >(beg, end);
         probs.push_back(prob);
       }
-      this->initialize(probs, gen, dim, sigma, neg_size, eta0, eta1, share);
+      this->initialize(probs, gen, dim, sigma, neg_size, eta0, eta1, enable_chopout, share);
     }
 
     template <class RandomGenerator>
@@ -68,11 +70,12 @@ namespace covec{
           const std::size_t neg_size = 1,
           const Real eta0 = 5e-3, // learning rate
           const Real eta1 = 1e-5, // final learning rate
+	  const bool enable_chopout = false,  // enable_chopout or not
           const std::vector<std::size_t>& share = std::vector<std::size_t>() // put indices to share parameters          
           )
-      : num_entries_(), dim_(), neg_size_(), eta0_()
+      : num_entries_(), dim_(), neg_size_(), eta0_(), eta1_(), chopout_enabled_(), keep_dim_()
       , vs_(), cs_(), share_()
-    { this->initialize(probs, gen, dim, sigma, neg_size, eta0, eta1, share); }
+    { this->initialize(probs, gen, dim, sigma, neg_size, eta0, eta1, enable_chopout, share); }
      
 
   public:
@@ -107,6 +110,9 @@ namespace covec{
     inline const Real eta1() const
     { return this->eta1_; }
 
+    inline const bool chopout_enabled() const
+    { return this->chopout_enabled_; }
+
     inline const std::vector<std::size_t>& share() const
     { return this->share_; }
 
@@ -120,6 +126,7 @@ namespace covec{
                     const std::size_t neg_size = 1,
                     const Real eta0 = 5e-3,
                     const Real eta1 = 1e-5,
+		    const bool enable_chopout = false,
                     const std::vector<std::size_t>& share = std::vector<std::size_t>() // put indices to share parameters
                     );
 
@@ -128,13 +135,15 @@ namespace covec{
     template <class Grad>
     void accumulate_grad(Grad& grad
                          , const std::vector<std::size_t>& sample
-                         , const POS_NEG pos_neg);
+                         , const POS_NEG pos_neg
+			 , const std::size_t K);
 
     // in case order == 2
     template <class Grad>
     void accumulate_grad_2(Grad& grad
                            , const std::vector<std::size_t>& sample
-                           , const POS_NEG pos_neg);
+                           , const POS_NEG pos_neg
+			   , const std::size_t K);
 
     inline Real next_eta(const std::size_t count) const
     {
@@ -154,6 +163,8 @@ namespace covec{
     std::size_t neg_size_;
     Real eta0_;
     Real eta1_;
+    bool chopout_enabled_;
+    std::vector<std::size_t> keep_dim_;
     std::vector<std::shared_ptr<std::discrete_distribution<int> > > probs_;
     //    std::vector<std::vector<std::vector<Real> > > vs_; // order -> entry -> dim -> value
     std::vector<std::shared_ptr<std::vector<std::vector<Real> > > > vs_; // order -> entry -> dim -> value    
@@ -172,6 +183,7 @@ namespace covec{
                                const std::size_t neg_size,
                                const Real eta0,
                                const Real eta1,
+			       const bool enable_chopout,
                                const std::vector<std::size_t>& share
                                )
   {
@@ -180,6 +192,8 @@ namespace covec{
     this->neg_size_ = neg_size;
     this->eta0_ = eta0;
     this->eta1_ = eta1;
+    this->chopout_enabled_ = enable_chopout;
+    this->keep_dim_ = std::vector<std::size_t>();
     this->share_ = share;
 
     this->num_entries_.clear();
@@ -241,12 +255,13 @@ namespace covec{
   template <class Grad>
   void Covec<Real>::accumulate_grad(Grad& grad
                                     , const std::vector<std::size_t>& sample
-                                    , const typename Covec::POS_NEG pos_neg)
+                                    , const typename Covec::POS_NEG pos_neg
+				    , const std::size_t K)
   {
     assert( sample.size() == this->order() );
 
     if( this->order() == 2 ){
-      return accumulate_grad_2(grad, sample, pos_neg);
+      return accumulate_grad_2(grad, sample, pos_neg, K);
     }
 
     // count the occurences and
@@ -257,7 +272,7 @@ namespace covec{
       ++(*this->cs_[i])[j];
       const auto& v = (*this->vs_[i])[j];
       assert( v.size() == this->dimension() );
-      for(std::size_t k = 0, K = this->dimension(); k < K; ++k){
+      for(std::size_t k = 0; k < K; ++k){
         Hadamard_product[k] *= v[k];
       }
     }
@@ -277,9 +292,15 @@ namespace covec{
       auto& g = grad_i.second;
       auto eta = this->next_eta(cs_ij);
       const auto C = coeff * eta;
-      for(std::size_t k = 0, K = this->dimension(); k < K; ++k){
-        if( Hadamard_product[k] == 0 ){ continue; }
+      for(std::size_t k = 0; k < K; ++k){
+        if( Hadamard_product[k] == 0 ){
+	  g[k] = 0;
+	  continue;
+	}
         g[k] = C * Hadamard_product[k] / v[k];
+      }
+      for(std::size_t k = K + 1; k < this->dimension(); ++k){
+	g[k] = 0;
       }
     }
 
@@ -290,7 +311,8 @@ namespace covec{
   template <class Grad>
   void Covec<Real>::accumulate_grad_2(Grad& grad
                                       , const std::vector<std::size_t>& sample
-                                      , const typename Covec::POS_NEG pos_neg)
+                                      , const typename Covec::POS_NEG pos_neg
+				      , const std::size_t K)
   {
     assert( sample.size() == 2 && this->order() == 2 );
 
@@ -315,8 +337,11 @@ namespace covec{
       const auto& v = (i == 0 ? v1 : v0);
       auto eta = this->next_eta(cs_ij);
       const auto C = coeff * eta;
-      for(std::size_t k = 0, K = this->dimension(); k < K; ++k){
+      for(std::size_t k = 0; k < K; ++k){
         g[k] = C * v[k];
+      }
+      for(std::size_t k= K + 1; k < this->dimension(); ++k){
+        g[k] = 0;	
       }
     }
   }
@@ -331,11 +356,16 @@ namespace covec{
     std::vector<std::size_t> negative_sample(this->order());
     
     auto gitr = gbeg;
+    std::uniform_int_distribution<std::size_t> keep_rate_dist(1, this->dimension());
     for(auto itr = beg; itr != end; ++itr){
+      std::size_t K = this->dimension();
+      if(this->chopout_enabled()){
+	K = keep_rate_dist(gen);
+      }
       // gradient from positive sample
       assert(gitr->size() == order() );
       assert( itr->size() == order() );
-      accumulate_grad(*gitr, *itr, POSITIVE);
+      accumulate_grad(*gitr, *itr, POSITIVE, K);
       ++gitr;
       // gradient(s) from negative sample      
       for(std::size_t m = 0, M = this->neg_size(); m < M; ++m){
@@ -344,7 +374,7 @@ namespace covec{
           negative_sample[i] = j;
         }
         assert( negative_sample.size() == order() );
-        accumulate_grad(*gitr, negative_sample, NEGATIVE);
+        accumulate_grad(*gitr, negative_sample, NEGATIVE, K);
         ++gitr;
       }
     }
